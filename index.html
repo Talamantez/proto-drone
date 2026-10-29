@@ -41,6 +41,33 @@
   .chk input { margin-top: 2px; flex: none; }
   #capInfo, #chal { white-space: pre-line; }
   .tag { display: grid; place-items: center; min-width: 26px; height: 16px; padding: 0 3px; border: 1px solid #000; color: #fff; font-weight: 700; font-size: 10px; text-shadow: 0 0 2px #000; }
+  #top { position: sticky; top: -10px; z-index: 500; background: var(--panel); margin: -10px -12px 0; padding: 10px 12px 8px; border-bottom: 1px solid var(--line); box-shadow: 0 4px 8px rgba(0,0,0,.35); }
+  .titlerow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .titlerow > span { white-space: nowrap; flex: none; }
+  #top #hint { max-height: 4.3em; overflow-y: auto; }
+  #top .row { margin: 6px 0 2px; align-items: center; }
+  #top button.primary { min-width: 74px; padding: 5px 12px; font-weight: 600; }
+  #top .scale { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--dim); }
+  #top .scale input { width: 90px; flex: none; }
+  .mini { display: flex; gap: 14px; flex-wrap: wrap; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .mini b { color: var(--fg); font-weight: 600; }
+  button.demo { background: #2f4a37; border-color: #4f7a5a; }
+  #hwBar { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 1000; display: flex; align-items: center; gap: 8px; padding: 0 14px; pointer-events: none; }
+  #hwBar > * { pointer-events: auto; }
+  #hwBar input { flex: 1; }
+  #hwBar span { background: rgba(18,22,26,.85); padding: 2px 7px; border-radius: 3px; border: 1px solid var(--line); }
+  #hwDiv { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 4px #000; z-index: 999; pointer-events: none; }
+  .envleg i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 1px solid #000; vertical-align: -1px; }
+  .tour-hl { outline: 2px solid var(--warn); outline-offset: 3px; border-radius: 3px; position: relative; z-index: 400; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { outline-color: transparent; } }
+  #tour { position: fixed; z-index: 2000; width: min(340px, calc(100vw - 24px)); background: #20272e; border: 1px solid var(--warn); border-radius: 6px; padding: 12px 14px; box-shadow: 0 8px 28px rgba(0,0,0,.6); font-size: 13px; line-height: 1.5; }
+  #tour h3 { margin: 0 0 6px; font-size: 14px; }
+  #tour p { margin: 0 0 8px; }
+  #tour .nav { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+  #tour .nav .step { color: var(--dim); margin-right: auto; font-size: 11px; }
+  #tour.center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(430px, calc(100vw - 24px)); }
+  #veil { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1999; }
+  #veil[hidden], #tour[hidden] { display: none; }
   @media (max-width: 800px) {
     #app { grid-template-columns: 1fr; grid-template-rows: 40% 60%; }
     #side { order: 2; border-right: 0; border-top: 1px solid var(--line); }
@@ -50,8 +77,16 @@
 <body>
 <div id="app">
   <aside id="side">
-    <h1>Fleet comms survey simulator</h1>
-    <div id="hint">Draw a survey area to begin.</div>
+    <div id="top">
+      <div class="titlerow"><h1>Fleet comms survey simulator</h1><span><button id="btnDemo" class="demo" title="Load a ready-to-run example">▶ Try the demo</button> <button id="btnHelp" title="Replay the guided tour">? Tour</button></span></div>
+      <div id="hint">New here? Press “Try the demo” for a ready-to-run example, or draw your own survey area.</div>
+      <div class="row">
+        <button id="btnRun" class="primary" disabled>Start</button>
+        <button id="btnReset" disabled>Reset run</button>
+        <label class="scale"><span style="width:auto">Speed <b id="vMult"></b></span><input type="range" id="pMult" min="1" max="60" value="10"></label>
+      </div>
+      <div class="mini"><span>Time <b id="qTime">–</b></span><span>Coverage <b id="qCov">–</b></span><span>Anomalies found <b id="qFound">–</b></span></div>
+    </div>
 
     <h2>Mission (stored in IndexedDB)</h2>
     <select id="missionSel"></select>
@@ -65,6 +100,7 @@
     <h2>Site challenges (arenas, not real boundaries)</h2>
     <select id="pPreset">
       <option value="">Pick a challenge…</option>
+      <option value="demo">Starter: Pompeii Quick Survey (easy, no checklist)</option>
       <option value="bamiyan">Bamiyan: Cliff Face Cartographer</option>
       <option value="gobekli">Göbekli Tepe: Under the Roof</option>
       <option value="aten">Amarna Great Aten Temple: Sun Temple Sprint</option>
@@ -105,6 +141,24 @@
     <label><span>Hard snap (nearest)</span><input type="checkbox" id="poHard"></label>
     <div class="dim" id="poiNote">Weight 1 = a POI zone counts as much again as an ordinary observation cell (cell weight = 1 + max nearby bonus). Bonus scales with a road-class flow proxy: OSM has no traffic counts. Snapping picks the best-scoring eligible node, then sets the base back from it toward the site; launch from a safe pull-off, never the carriageway.</div>
 
+    <h2>Public data overlays (context, not survey truth)</h2>
+    <div class="dim">Free public sources, all coarse next to a drone survey. Tick to show.</div>
+    <div class="chk"><input type="checkbox" id="ovNdvi"><span>Vegetation greenness · NASA MODIS NDVI (~250 m)</span></div>
+    <div class="chk"><input type="checkbox" id="ovLst"><span>Surface heat · NASA MODIS day temperature (~1 km)</span></div>
+    <div class="chk"><input type="checkbox" id="ovNight"><span>Night lights · NASA VIIRS</span><select id="ovNightYr" style="width:auto"><option value="default">latest</option><option value="2016-01-01">2016</option><option value="2012-01-01">2012</option></select></div>
+    <div class="chk"><input type="checkbox" id="ovWater"><span>Surface-water change 1984–2021 · EU JRC (new / lost water)</span></div>
+    <div class="chk"><input type="checkbox" id="ovFlood"><span>Flood hazard zones · FEMA (USA only)</span></div>
+    <label><span>NASA date</span><input type="date" id="ovDate"></label>
+    <label><span>Overlay opacity</span><input type="range" id="ovOp" min="20" max="100" value="70"><span class="val" id="vOvOp"></span></label>
+    <div class="dim">Date blank = latest. NDVI covers roughly the last year; if tiles go blank, pick a more recent date.</div>
+
+    <h2>Urban decay &amp; renewal</h2>
+    <div class="row"><button id="btnEnv" disabled>Fetch land use, heritage &amp; decay hints</button><label style="margin:0"><input type="checkbox" id="envShow" checked> show</label></div>
+    <div class="dim envleg"><i style="background:#d4605a"></i>abandoned / disused / ruin <i style="background:#4ac8d8"></i>construction / brownfield <i style="background:#b07fe0"></i>heritage <i style="background:#8a949e"></i>building <i style="background:#5fae6b"></i>green</div>
+    <div id="envNote" class="dim" style="white-space:pre-line">Draw an area, then fetch. Uses volunteer-mapped OpenStreetMap tags, so “none found” is not “no decay”.</div>
+    <label><span>Past imagery</span><select id="hwSel"><option>loading…</option></select></label>
+    <div class="chk"><input type="checkbox" id="hwOn" disabled><span>Compare past vs today with a swipe (Esri Wayback). Dates are release dates; capture dates vary by place.</span></div>
+
     <h2>Power &amp; cost (quad, placeholder numbers)</h2>
     <label><span>Pack (Wh)</span><input type="number" id="eCap" value="150" min="20" step="10"></label>
     <label><span>Reserve (%)</span><input type="number" id="eRes" value="25" min="0" max="60"></label>
@@ -125,11 +179,8 @@
     <h2>Heritage pre-flight checklist (gates Start when profile is on)</h2>
     <div id="checks"></div>
 
-    <h2>Run</h2>
-    <label><span>Time scale</span><input type="range" id="pMult" min="1" max="60" value="10"><span class="val" id="vMult"></span></label>
+    <h2>Export</h2>
     <div class="row">
-      <button id="btnRun" class="primary" disabled>Start</button>
-      <button id="btnReset" disabled>Reset run</button>
       <button id="btnCsv" disabled>Export msg log CSV</button>
       <button id="btnManifest" disabled>Export survey manifest</button>
     </div>
@@ -178,6 +229,8 @@
   </aside>
   <div id="map"></div>
 </div>
+<div id="veil" hidden></div>
+<div id="tour" hidden role="dialog" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -572,7 +625,7 @@ function scatter(m) {
 
 // ================= Map layers / runtime construction =================
 function clearMission() {
-  ['poly', 'cells', 'finds', 'base', 'pois'].forEach(k => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
+  ['poly', 'cells', 'finds', 'base', 'pois', 'env'].forEach(k => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
   layers.d.forEach(o => ['trail', 'link', 'tag', 'belief'].forEach(k => map.removeLayer(o[k]))); layers.d = [];
 }
 
@@ -985,6 +1038,15 @@ const timeGoal = min => ({ label: `Finish within ${min} min`, val: x => fmtT(x.t
 // Arenas sit near the real coordinates but are game-sized rectangles, not site boundaries or survey records.
 // Coordinates: Bamiyan, Aten Temple and Blick Mead from Wikipedia; Göbekli Tepe is from memory, unverified.
 const PRESETS = {
+  demo: {
+    title: 'Pompeii Quick Survey (starter)', c: [40.7508, 14.4869], shape: 'rect', w: 420, h: 260, bearing: 0, zoom: 17,
+    params: { mode: 'area', n: 3, gsd: 5, fwd: 75, side: 65, swath: 25, speed: 8, feat: 12, heritage: false, layer: true, lteLat: 80, lteLoss: 3, loraLoss: 5 },
+    note: 'Starter: three drones sweep a 420 × 260 m block. Press Start. At about 1 minute one drone loses its links and the others pick up its rows. Try cutting a link yourself in the Fleet table.',
+    events: [
+      { t: 60, d: 1, links: ['lte', 'lora'], up: false, text: 'D2 drops off both links; failsafe RTL expected, then GCS reassigns its remaining rows' },
+    ],
+    goalsTitle: 'Goals', goals: [covGoal(90), findGoal(0.8), sepGoal, timeGoal(8)],
+  },
   bamiyan: {
     title: 'Bamiyan: Cliff Face Cartographer', c: [34.8319, 67.8267], shape: 'line', w: 80, zoom: 16,
     params: { mode: 'facade', wallH: 58, n: 3, gsd: 4, fwd: 80, side: 70, feat: 12, heritage: true, lteLat: 120, lteLoss: 8, loraLoss: 8 },
@@ -1078,11 +1140,12 @@ function renderUi(force) {
 
   const S = mission.stats;
   const avg = l => S.lat[l].n ? `${Math.round(S.lat[l].sum / S.lat[l].n)} / ${Math.round(S.lat[l].max)} ms` : '–';
-  $('sTime').textContent = fmtT(mission.simT);
+  $('sTime').textContent = $('qTime').textContent = fmtT(mission.simT);
   $('sWCov').textContent = P.w ? wpct(R.gcsCov) + '%' : '–';
   $('sCov').textContent = pct(R.gcsCov) + '%'; $('sTruth').textContent = pct(R.cov) + '%';
   const det = new Set(); R.d.forEach(d => d.detected.forEach(x => det.add(x)));
   $('sFound').textContent = `${mission.found.length} / ${det.size} / ${mission.hidden.length}`;
+  $('qCov').textContent = pct(R.gcsCov) + '%'; $('qFound').textContent = `${mission.found.length} / ${mission.hidden.length}`;
   $('sSep').textContent = mission.alerts;
   $('sMsg').textContent = `${S.sent} / ${S.delivered}`;
   $('sDrop').textContent = `${S.dropLoss} / ${S.dropDown}`;
@@ -1156,7 +1219,7 @@ function setControls() {
   const has = !!mission;
   ['btnPlan', 'btnReset', 'btnDelete', 'btnCsv', 'btnManifest'].forEach(id => $(id).disabled = !has);
   const area = has && (mission.params.mode || 'area') === 'area';
-  $('btnPois').disabled = !area; $('btnSnap').disabled = !area || !mission.pois.length; $('btnUnsnap').disabled = !area || !mission.baseLL;
+  $('btnEnv').disabled = !has; $('btnPois').disabled = !area; $('btnSnap').disabled = !area || !mission.pois.length; $('btnUnsnap').disabled = !area || !mission.baseLL;
   $('btnRun').disabled = !has || mission.status === 'complete';
   document.querySelectorAll('#checks input').forEach((el, i) => { el.disabled = !has; el.checked = has && !!mission.checks[i]; });
 }
@@ -1165,7 +1228,7 @@ async function loadMission(id) {
   running = false; $('btnRun').textContent = 'Start';
   if (!id) {
     mission = null; R = null; clearMission(); $('drones').innerHTML = ''; $('log').textContent = ''; $('msgLog').textContent = '';
-    $('elevWrap').hidden = true; $('chalWrap').hidden = true; setControls(); return;
+    $('elevWrap').hidden = true; $('chalWrap').hidden = true; ['qTime', 'qCov', 'qFound'].forEach(id => $(id).textContent = '–'); setControls(); return;
   }
   mission = await DB.getMission(id);
   mission.checks = mission.checks || []; mission.fired = mission.fired || [];
@@ -1337,11 +1400,11 @@ $('poiTable').addEventListener('input', poiSettingsChanged);
 ['poBuf', 'poRad', 'poBack', 'poZone', 'poHard'].forEach(id => $(id).addEventListener('change', poiSettingsChanged));
 
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-async function overpass(q) {
+async function overpass(q, ms = 30000) {
   let err;
   for (let round = 0; round < 2; round++) for (const url of OVERPASS) {
     try {
-      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 30000);
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
       const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
       clearTimeout(to);
       if (r.ok) return (await r.json()).elements;
@@ -1425,9 +1488,192 @@ $('btnCsv').onclick = () => {
 };
 window.addEventListener('pagehide', saveMission);
 
+// ================= Public data overlays, decay & renewal =================
+const GIBS = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/';
+const gibsLayer = (id, lvl, time) => L.tileLayer(`${GIBS}${id}/default/${time}/GoogleMapsCompatible_Level${lvl}/{z}/{y}/{x}.png`,
+  { maxNativeZoom: lvl, maxZoom: 19, zIndex: 6, attribution: 'NASA GIBS' });
+const femaFlood = L.TileLayer.extend({
+  getTileUrl(c) {   // ArcGIS export for one XYZ tile, in web-mercator metres
+    const R = 20037508.342789244, n = 2 ** c.z, sz = 2 * R / n, x0 = -R + c.x * sz, y1 = R - c.y * sz;
+    return 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export?' +
+      `bbox=${x0},${y1 - sz},${x0 + sz},${y1}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&layers=show:28&f=image`;
+  },
+});
+const overlays = {
+  ovNdvi: () => gibsLayer('MODIS_Terra_NDVI_8Day', 9, $('ovDate').value || 'default'),
+  ovLst: () => gibsLayer('MODIS_Terra_Land_Surface_Temp_Day', 7, $('ovDate').value || 'default'),
+  ovNight: () => gibsLayer('VIIRS_Black_Marble', 8, $('ovNightYr').value),
+  ovWater: () => L.tileLayer('https://storage.googleapis.com/global-surface-water/tiles2021/transitions/{z}/{x}/{y}.png', { maxNativeZoom: 13, maxZoom: 19, zIndex: 6, attribution: 'EC JRC Global Surface Water' }),
+  ovFlood: () => new femaFlood('', { maxZoom: 19, zIndex: 6, attribution: 'FEMA NFHL' }),
+};
+const ovLive = {};
+function ovSync(id) {
+  if (ovLive[id]) { map.removeLayer(ovLive[id]); ovLive[id] = null; }
+  if (!$(id).checked) return;
+  ovLive[id] = overlays[id]().setOpacity(+$('ovOp').value / 100).addTo(map);
+}
+Object.keys(overlays).forEach(id => $(id).addEventListener('change', () => ovSync(id)));
+$('ovDate').addEventListener('change', () => ['ovNdvi', 'ovLst'].forEach(ovSync));
+$('ovNightYr').addEventListener('change', () => ovSync('ovNight'));
+$('ovOp').addEventListener('input', () => {
+  $('vOvOp').textContent = $('ovOp').value + '%';
+  Object.values(ovLive).forEach(l => l && l.setOpacity(+$('ovOp').value / 100));
+});
+$('vOvOp').textContent = $('ovOp').value + '%';
+
+// ---- OSM land use, heritage, decay and renewal hints ----
+const envCanvas = L.canvas({ padding: 0.5 });
+const ENV = { decay: '#d4605a', build: '#4ac8d8', heritage: '#b07fe0', bldg: '#8a949e', green: '#5fae6b', land: '#c9a24a' };
+function envClass(t) {
+  const keys = Object.keys(t);
+  if (keys.some(k => /^(abandoned|disused|ruins)(:|$)/.test(k)) || t.building === 'ruins' || t.landuse === 'brownfield' || t.historic === 'ruins') return 'decay';
+  if (t.landuse === 'construction' || t.building === 'construction' || t.construction || t.proposed || t.highway === 'construction') return 'build';
+  if (t.heritage || t.historic) return 'heritage';
+  if (t.building) return 'bldg';
+  if (/^(grass|forest|meadow|recreation_ground|village_green|orchard|cemetery|allotments)$/.test(t.landuse || '')) return 'green';
+  return 'land';
+}
+function drawEnv(els) {
+  if (layers.env) map.removeLayer(layers.env);
+  const cnt = { decay: 0, build: 0, heritage: 0, bldg: 0, green: 0, land: 0 }, g = L.layerGroup();
+  for (const e of els) {
+    const t = e.tags || {}, c = envClass(t); cnt[c]++;
+    const tip = Object.entries(t).slice(0, 6).map(([k, v]) => `${esc(k)}=${esc(v)}`).join('<br>');
+    const st = { renderer: envCanvas, color: ENV[c], weight: c === 'bldg' || c === 'land' ? 1 : 2, fillColor: ENV[c], fillOpacity: c === 'land' ? .08 : c === 'green' || c === 'heritage' ? .12 : .35 };
+    let o;
+    if (e.type === 'node') o = L.circleMarker([e.lat, e.lon], { ...st, radius: 4, fillOpacity: .9 });
+    else if (e.geometry && e.geometry.length > 1) {
+      const pts = e.geometry.filter(Boolean).map(p => [p.lat, p.lon]);
+      o = pts.length > 3 && e.geometry[0] && pts[0][0] === pts[pts.length - 1][0] ? L.polygon(pts, st) : L.polyline(pts, st);
+    }
+    if (o) g.addLayer(o.bindTooltip(`<b>${c}</b><br>${tip}`));
+  }
+  layers.env = g; if ($('envShow').checked) g.addTo(map);
+  return cnt;
+}
+$('envShow').onchange = () => { if (layers.env) $('envShow').checked ? layers.env.addTo(map) : map.removeLayer(layers.env); };
+$('btnEnv').onclick = async () => {
+  if (!mission) return;
+  const ys = mission.poly.map(p => p[0]), xs = mission.poly.map(p => p[1]), pad = 0.0004;
+  const bb = [Math.min(...ys) - pad, Math.min(...xs) - pad, Math.max(...ys) + pad, Math.max(...xs) + pad].map(v => v.toFixed(6)).join(',');
+  $('btnEnv').disabled = true; setHint('Querying OpenStreetMap for land use, heritage and decay tags… public servers can take up to a minute.');
+  try {
+    const els = await overpass(`[out:json][timeout:50];(` +
+      `way["building"](${bb});way["landuse"](${bb});way["historic"](${bb});node["historic"](${bb});way["heritage"](${bb});node["heritage"](${bb});` +
+      `nwr["abandoned"](${bb});nwr["disused"](${bb});way["ruins"](${bb});way["construction"](${bb});way["highway"="construction"](${bb});` +
+      `);out geom tags;`, 60000);
+    const cnt = drawEnv(els);
+    const bt = cnt.bldg + cnt.decay + cnt.build;
+    $('envNote').textContent =
+      `${els.length} OSM features in and around the area.\n` +
+      `Buildings and structures: ${bt} · abandoned / disused / ruin: ${cnt.decay} · construction / brownfield: ${cnt.build} · heritage: ${cnt.heritage}\n` +
+      `Use “Past imagery” to see what changed, and treat zero hits with suspicion: OSM is mapped by volunteers. © OpenStreetMap contributors.`;
+    setHint(`${els.length} OSM features drawn. Hover a shape for its tags.`);
+    logEvent(`Fetched OSM land-use/decay hints: ${cnt.decay} decay, ${cnt.build} construction, ${cnt.heritage} heritage, ${bt} structures`, 'plan');
+  } catch (e) { setHint('Overpass failed: ' + e.message + '. Retry in a moment.'); }
+  $('btnEnv').disabled = !mission;
+};
+
+// ---- past imagery swipe (Esri Wayback) ----
+let hwLayer = null, hwFrac = 0.5, hwBar = null, hwDiv = null;
+const WAYBACK_CFG = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
+const hwTitle = t => (t.itemTitle.match(/\d{4}-\d{2}-\d{2}/) || [t.itemTitle])[0];
+function hwClip() {
+  if (!hwLayer || !map.hasLayer(hwLayer)) return;
+  const nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(map.getSize());
+  hwLayer.getContainer().style.clip = `rect(${nw.y}px,${se.x}px,${se.y}px,${nw.x + (se.x - nw.x) * hwFrac}px)`;
+  hwDiv.style.left = `calc(${hwFrac * 100}% - 1px)`;
+}
+function hwBuild() {
+  if (hwLayer) { map.removeLayer(hwLayer); hwLayer = null; }
+  if (!$('hwOn').checked) { if (hwBar) hwBar.hidden = hwDiv.hidden = true; return; }
+  const sel = $('hwSel'), date = sel.selectedOptions[0].textContent;
+  hwLayer = L.tileLayer(`https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${sel.value}/{z}/{y}/{x}`,
+    { maxNativeZoom: 18, maxZoom: 19, zIndex: 3, attribution: 'Esri Wayback' }).addTo(map);
+  if (!hwBar) {
+    hwBar = document.createElement('div'); hwBar.id = 'hwBar';
+    hwBar.innerHTML = '<span id="hwL">Today</span><input type="range" id="hwPos" min="0" max="100" value="50"><span id="hwR"></span>';
+    hwDiv = document.createElement('div'); hwDiv.id = 'hwDiv';
+    map.getContainer().append(hwBar, hwDiv);
+    L.DomEvent.disableClickPropagation(hwBar);
+    hwBar.querySelector('input').addEventListener('input', e => { hwFrac = e.target.value / 100; hwClip(); });
+    map.on('move zoom resize viewreset', hwClip);
+  }
+  hwBar.hidden = hwDiv.hidden = false; $('hwR').textContent = date;
+  hwLayer.on('load', hwClip); hwClip();
+  setHint(`Swipe: left = today, right = Esri imagery release ${date}. Drag the slider along the bottom of the map.`);
+}
+$('hwOn').onchange = hwBuild; $('hwSel').onchange = () => { if ($('hwOn').checked) hwBuild(); };
+fetch(WAYBACK_CFG).then(r => r.json()).then(cfg => {
+  const rel = Object.entries(cfg).map(([id, v]) => ({ id, d: hwTitle(v) })).sort((a, b) => b.d.localeCompare(a.d));
+  const want = '2018-01-01', pick = rel.find(r => r.d <= want) || rel[rel.length - 1];
+  $('hwSel').textContent = '';
+  rel.forEach(r => { const o = document.createElement('option'); o.value = r.id; o.textContent = r.d; $('hwSel').appendChild(o); });
+  $('hwSel').value = pick.id; $('hwOn').disabled = false;
+}).catch(() => { $('hwSel').innerHTML = '<option>unavailable offline</option>'; });
+
+// ================= Demo + guided tour =================
+const store = {
+  get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+};
+const TOUR = [
+  { center: true, title: 'Welcome aboard 👋', html: `<p>This simulates a small fleet of survey drones mapping an area while their radio links (LTE, LoRa, Wi-Fi mesh) misbehave, so you can see what a ground station would actually know.</p><p>A starter mission is already loaded. This 1-minute tour shows you around.</p>` },
+  { sel: '#map', title: 'The survey area', html: `<p>The outlined block is the area to survey. Drones launch from the base (its first corner) and sweep it in lanes.</p><p><b style="color:#d9a441">Amber</b> cells have been photographed by a drone. They turn <b style="color:#5fae6b">green</b> once the ground station has confirmed them.</p>` },
+  { sel: '#btnRun', title: 'Start, pause, reset', html: `<p>Press <b>Start</b>. These controls stay pinned at the top, so you never have to scroll for them. <b>Reset run</b> starts the same plan again.</p>` },
+  { sel: '#top .scale', title: 'Speed', html: `<p>Sim time runs faster than real time. Slide this up to skip ahead, or down to watch a moment closely.</p>` },
+  { sel: '#top .mini', title: 'Live scoreboard', html: `<p>Elapsed sim time, how much of the area the ground station has <i>confirmed</i>, and how many hidden anomalies (think “things worth a second look”) have been found.</p>` },
+  { sel: '#drones', title: 'Break something', html: `<p>One row per drone. Click an <b>LTE</b> or <b>LoRa</b> button to cut that link mid-flight and watch what happens: LoRa still carries position and detections, and a drone that loses everything returns home while the others take over its lanes.</p><p>In the demo, D2 loses both links at about 1 minute.</p>` },
+  { sel: '#chalWrap', title: 'Goals', html: `<p>Each mission has goals: coverage, anomalies found, no near-misses, finish on time. They tick off as you go, and you get a medal at the end.</p>` },
+  { sel: '#btnPlan', title: 'Tweak the plan', html: `<p>Change the number of drones, lane width, speed or heading in the sections above, then press <b>Apply &amp; re-plan</b>. Does a fourth drone beat a faster cruise speed? The Power &amp; cost section prices it.</p>` },
+  { sel: '#btnEnv', title: 'Decay, renewal & public data', html: `<p><b>Fetch land use…</b> outlines abandoned or ruined places (red), construction sites (cyan) and heritage (purple) from OpenStreetMap. Further up are NASA and EU overlays for greenness, heat, night lights and water change.</p><p>Tick <b>Compare past vs today</b> for a swipe between current imagery and an older release, handy for spotting what has been demolished, built or overgrown.</p>` },
+  { sel: '#btnDraw', title: 'Your own area', html: `<p><b>Draw area</b> lets you click out any polygon on the map. The “Site challenges” menu has harder missions with bad radio conditions, and “Fetch roads” pulls real road data from OpenStreetMap.</p>` },
+  { center: true, title: 'You’re set 🚁', html: `<p>Press <b>Start</b> and have a play. Reopen this tour any time with <b>? Tour</b>, or reload the example with <b>▶ Try the demo</b>.</p>` },
+];
+let tourI = -1, tourEl = null;
+function tourClear() { if (tourEl) tourEl.classList.remove('tour-hl'); tourEl = null; }
+function tourEnd() {
+  tourClear(); tourI = -1; $('tour').hidden = true; $('veil').hidden = true; store.set('tourSeen', '1');
+}
+function tourShow(i) {
+  tourClear(); tourI = i;
+  const st = TOUR[i], box = $('tour'), last = i === TOUR.length - 1;
+  box.className = st.center ? 'center' : '';
+  box.innerHTML = `<h3>${st.title}</h3>${st.html}<div class="nav"><span class="step">${i + 1} / ${TOUR.length}</span>` +
+    (i > 0 ? '<button data-a="back">Back</button>' : '') +
+    (last ? '' : '<button data-a="skip">Skip</button>') +
+    `<button class="primary" data-a="next">${last ? 'Let’s go' : i === 0 ? 'Start tour' : 'Next'}</button></div>`;
+  $('veil').hidden = !st.center; box.hidden = false;
+  if (st.center) { box.style.left = box.style.top = ''; return; }
+  const el = document.querySelector(st.sel);
+  if (el) { tourEl = el; el.classList.add('tour-hl'); if (el.closest('#side')) el.scrollIntoView({ block: 'center' }); }
+  const narrow = window.innerWidth <= 800, side = $('side').getBoundingClientRect(), r = el ? el.getBoundingClientRect() : side;
+  box.style.transform = 'none';
+  if (narrow) { box.style.left = '12px'; box.style.top = '8px'; }
+  else {
+    box.style.left = Math.min(window.innerWidth - box.offsetWidth - 12, side.right + 16) + 'px';
+    const mapTarget = st.sel === '#map';
+    box.style.top = (mapTarget ? 70 : Math.max(8, Math.min(window.innerHeight - box.offsetHeight - 8, r.top - 10))) + 'px';
+  }
+}
+$('tour').onclick = e => {
+  const a = e.target.dataset.a; if (!a) return;
+  if (a === 'skip') return tourEnd();
+  if (a === 'back') return tourShow(tourI - 1);
+  if (tourI >= TOUR.length - 1) return tourEnd();
+  tourShow(tourI + 1);
+};
+document.addEventListener('keydown', e => { if (tourI >= 0 && e.key === 'Escape') tourEnd(); });
+function startTour() { if (!mission) loadPreset('demo'); tourShow(0); }
+$('btnHelp').onclick = startTour;
+$('btnDemo').onclick = () => { loadPreset('demo'); };
+
 renderPoiTable(defaultPoiCfg());
 syncLabels(); setControls();
-refreshMissionList('').catch(err => setHint('IndexedDB unavailable: ' + err));
+refreshMissionList('').then(() => {
+  if (store.get('tourSeen')) return;
+  startTour();      // first visit: load the starter so the map isn't empty, then guide
+}).catch(err => setHint('IndexedDB unavailable: ' + err));
 </script>
 </body>
 </html>
