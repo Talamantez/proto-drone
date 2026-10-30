@@ -174,3 +174,13 @@ button.cta:hover:not(:disabled) { background: #5bf09b; border-color: #b4ffd3; }
 #threatList details { border-bottom: 1px solid var(--line); padding: 3px 0; }
 #threatList summary { cursor: pointer; } #threatList .tag { float: right; font-size: 10px; color: var(--dim); }
 #threatList .tag.live { color: var(--ok); } #threatList p { margin: 3px 0 5px; color: var(--dim); }
+#threatBox { position: absolute; top: 134px; right: 10px; z-index: 1000; width: 170px; }
+#threatBox .atk { width: 100%; margin: 0; }
+#threatMenu { margin-top: 4px; background: rgba(24,29,34,.96); border: 1px solid var(--line); border-radius: 6px; padding: 6px; max-height: 60vh; overflow-y: auto; }
+#threatMenu .t { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin: 4px 0 3px; }
+#threatMenu[hidden], #threatBox[hidden] { display: none; }
+#shieldSeg { display: flex; } #shieldSeg button { flex: 1; border-radius: 0; padding: 3px 0; }
+#shieldSeg button.on { background: #3ddc84; color: #04210f; border-color: #7af0b0; font-weight: 700; }
+#threatItems { display: grid; gap: 3px; } #threatItems button { text-align: left; padding: 4px 8px; }
+#defList label.chk { display: flex; margin: 4px 0; } #defList input { flex: none; }
+@media (max-width: 800px) { #threatBox { top: 98px; } }

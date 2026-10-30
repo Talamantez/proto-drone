@@ -204,3 +204,44 @@ test('a replayed signed command beats signatures but not the freshness check', a
   const b = makeMission(); b.def.auth = b.def.fresh = true; run(30); attackReplay(1); run(40);
   assert.ok(!S.R.d[1].rtl && b.sec.rejected === 1, 'stale timestamp rejected');
 });
+
+test('eavesdropper reads traffic unless links are encrypted', async () => {
+  const { attackSnoop } = await import('../js/sim.js');
+  const go = enc => { const m = makeMission(); m.def.encrypt = enc; run(20); attackSnoop(); S.R.snoop.r = 1e5; run(120); return m.sec; };
+  const open = go(false); assert.ok(open.leaked > 10 && open.leakedDet >= 0 && open.sealed === 0);
+  const shut = go(true); assert.ok(shut.leaked === 0 && shut.sealed > 10);
+});
+
+test('a radio flood grounds a drone unless rate limiting is on', async () => {
+  const { attackFlood } = await import('../js/sim.js');
+  const run1 = rate => { const m = makeMission(); m.def.rate = rate; run(20); const at = m.dist[0]; attackFlood(0); run(50); return m.dist[0] - at; };
+  assert.ok(run1(false) < 5, 'flooded drone barely moves');
+  assert.ok(run1(true) > 100, 'rate-limited drone keeps flying');
+});
+
+test('bad map data sends a drone outside the area unless input is validated', async () => {
+  const { attackPoison } = await import('../js/sim.js');
+  const a = makeMission(); run(20); const before = S.R.d[0].total; attackPoison(0);
+  assert.ok(S.R.d[0].total > before + 300);
+  const b = makeMission(); b.def.validate = true; run(20); const t = S.R.d[0].total; attackPoison(0);
+  assert.equal(S.R.d[0].total, t); assert.ok(a.sec.poison === 1);
+});
+
+test('decoys fool the camera unless a second sensor confirms', async () => {
+  const { attackDecoy } = await import('../js/sim.js');
+  const { buildReport } = await import('../js/report.js');
+  const a = makeMission(); run(10); attackDecoy(); run(3600);
+  assert.ok(buildReport(a, S.P, S.R).falseAlarms > 0, 'decoys confirmed as real');
+  const b = makeMission(); b.def.confirm = true; run(10); attackDecoy(); run(3600);
+  assert.equal(buildReport(b, S.P, S.R).falseAlarms, 0); assert.ok(b.sec.dismissed > 0);
+});
+
+test('tampered firmware makes phantom coverage; secure boot refuses it', async () => {
+  const { attackFirmware } = await import('../js/sim.js');
+  const { buildReport } = await import('../js/report.js');
+  const a = makeMission(); run(10); attackFirmware(1); run(3600);
+  const r = buildReport(a, S.P, S.R);
+  assert.ok(r.phantom > 0 && r.verdict !== 'COMPLETE', `phantom ${r.phantom} ${r.verdict}`);
+  const b = makeMission(); b.def.attest = true; run(10); attackFirmware(1); run(3600);
+  assert.equal(buildReport(b, S.P, S.R).phantom, 0);
+});

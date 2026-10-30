@@ -116,14 +116,9 @@
     <label><span class="lora">LoRa loss</span><input type="range" id="pLoraLoss" min="0" max="60" value="5"><span class="val" id="vLoraLoss"></span></label>
     <div class="dim">LoRa ≈450±150 ms, carries heartbeat, position and detections only. Wi-Fi mesh ≈15 ms, 400 m range, drone↔drone.</div>
 
-    <h2>Spoofing defences</h2>
-    <div class="chk"><input type="checkbox" id="defGnss"><span>GNSS integrity check: cross-check the GPS fix against inertial / visual navigation</span></div>
-    <div class="chk"><input type="checkbox" id="defAuth"><span>Signed commands: drones reject unsigned "GCS" orders</span></div>
-    <div class="chk"><input type="checkbox" id="defAudit"><span>GCS audit: unexplained return-home on a healthy link triggers a signed resume</span></div>
-    <div class="chk"><input type="checkbox" id="defDaa"><span>Detect-and-avoid: sense unknown aircraft nearby and evade</span></div>
-    <div class="chk"><input type="checkbox" id="defHop"><span>Frequency hopping: links survive jamming, degraded</span></div>
-    <div class="chk"><input type="checkbox" id="defFresh"><span>Freshness check: reject commands with stale timestamps (stops replay)</span></div>
-    <div class="dim">Start with all off, launch an attack from the map (🛰 / 🎭), then switch them on and compare the reports.</div>
+    <h2>Shields</h2>
+    <div class="dim">Start with Shields off, launch a threat from the map's ⚔ Threats button, then turn them on and compare the reports.</div>
+    <details><summary>Fine-tune each shield</summary><div id="defList"></div></details>
 
     <h2>Threat library</h2>
     <div id="threatList"></div>
@@ -193,7 +188,17 @@
         <button id="dbCancel" class="when-drawing">Cancel</button>
       </div>
     </div>
-    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div><button id="btnRogue" class="atk" title="A hostile drone chases the fleet: takeover over open radio, then collision">🛸 Rogue drone</button><button id="btnJam" class="atk" title="A ground jammer blankets part of the area with RF noise">📻 RF jammer</button><button id="btnReplay" class="atk" title="Replay a recorded, validly signed RTL command">⏪ Replay</button><button id="btnGps" class="atk" title="Drag one drone's GPS fix away from reality">🛰 GPS spoof</button><button id="btnCmd" class="atk" title="Inject a forged return-to-launch command posing as the GCS">🎭 Forged RTL</button><button id="btnZilla" class="zilla" title="Unleash a monster: it jams comms, destroys drones in its path and tramples ground. Drones hold, reroute work and cut losses.">🦖 Godzilla</button></div>
+    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div></div>
+    <div id="threatBox" hidden>
+      <button id="btnThreats" class="atk">⚔ Threats</button>
+      <div id="threatMenu" hidden>
+        <div class="t">Shields</div>
+        <div id="shieldSeg"><button data-lvl="off">Off</button><button data-lvl="basic">Basic</button><button data-lvl="full">Full</button></div>
+        <div id="shieldCustom" class="dim" hidden>Custom mix (see Shields in the sidebar)</div>
+        <div class="t">Launch</div>
+        <div id="threatItems"></div>
+      </div>
+    </div>
   </div>
 </div>
 <div id="veil" hidden></div>

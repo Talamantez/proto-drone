@@ -20,7 +20,7 @@ export function resetRun(m) {
   Object.assign(m, {
     dist: [], covered: [], gcsCovered: [], found: [], dr: [], gs: [], simT: 0, alerts: 0, status: 'planned',
     stats: freshStats(), assignN: 0, faults: Array.from({ length: m.params.n }, () => ({ lte: true, lora: true })),
-    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false, daa: false, hop: false, fresh: false }, sec: { jam: 0, replay: 0, rogue: 0, hijacked: 0, collisions: 0, evasions: 0, gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
+    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false, daa: false, hop: false, fresh: false, encrypt: false, rate: false, validate: false, confirm: false, attest: false }, decoys: [], sec: { snoop: 0, leaked: 0, leakedDet: 0, sealed: 0, flood: 0, poison: 0, decoys: 0, dismissed: 0, tainted: 0, jam: 0, replay: 0, rogue: 0, hijacked: 0, collisions: 0, evasions: 0, gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
   });
 }
 export function scatter(m) {
@@ -176,6 +176,87 @@ function jamTick() {
   if (j && S.R.t >= j.t1) { S.R.jammer = null; incident('The RF jammer has gone quiet', 'attack'); }
 }
 
+// --- Eavesdropping, flooding, bad data, decoys, tainted firmware ---
+const randPoint = () => {
+  const xy = S.P.xy, p = xy[Math.floor(S.R.rng() * xy.length)], cx = xy.reduce((a, q) => a + q[0], 0) / xy.length, cy = xy.reduce((a, q) => a + q[1], 0) / xy.length;
+  return [(p[0] + cx) / 2, (p[1] + cy) / 2];
+};
+export const SNOOP = { r: 250, dur: 120 };
+export function attackSnoop() {
+  if (S.R.snoop || !S.P.xy.length) return false;
+  S.R.snoop = { pos: randPoint(), r: SNOOP.r, t1: S.R.t + SNOOP.dur, ids: new Set() };
+  sec().snoop++;
+  incident(`ATTACK: an eavesdropper sets up a radio receiver ${SNOOP.r} m from the action`, 'attack');
+  return true;
+}
+// Flooding: junk frames saturate a drone's command queue; it hovers unable to fly until the flood stops (rate limiting drops the junk).
+export function attackFlood(i) {
+  const d = S.R.d[i];
+  if (!d || d.lost || d.landed || d.flood) return false;
+  d.flood = { t1: S.R.t + 60 };
+  sec().flood++;
+  incident(`ATTACK: junk-frame flood against D${i + 1}'s radio`, 'attack');
+  return true;
+}
+function floodBusy(d) {
+  if (!d.flood) return false;
+  if (S.R.t >= d.flood.t1) { d.flood = null; if (!(S.mission.def || {}).rate) incident(`D${d.i + 1} recovered from the flood`, 'workaround'); return false; }
+  if ((S.mission.def || {}).rate) { if (!d.flood.logged) { d.flood.logged = true; incident(`D${d.i + 1} rate limiter is dropping the junk flood; flying on`, 'workaround'); } return false; }
+  return true;
+}
+// Data poisoning: tampered map data inserts a waypoint far outside the area into a drone's route.
+export function attackPoison(i) {
+  const d = S.R.d[i], m = S.mission;
+  if (!d || d.lost || d.landed || d.rtl || !S.P.xy.length) return false;
+  const idx = d.cum.findIndex(c => c > m.dist[i]);
+  if (idx < 1) return false;
+  sec().poison++;
+  const v = d.path[idx], c = randPoint(), len = Math.hypot(v[0] - c[0], v[1] - c[1]) || 1;
+  if ((m.def || {}).validate) {
+    incident(`ATTACK: poisoned map data tried to add a waypoint outside the area to D${i + 1}'s route`, 'attack');
+    incident(`Input validation rejected D${i + 1}'s new waypoint: it is outside the survey geofence`, 'workaround');
+    return true;
+  }
+  const far = v.slice(); far[0] = v[0] + (v[0] - c[0]) / len * 300; far[1] = v[1] + (v[1] - c[1]) / len * 300;
+  const before = d.total;
+  d.path.splice(idx, 0, far); d.cum = buildCum(d.path); d.total = d.cum[d.cum.length - 1];
+  S.R.g[i].total += d.total - before;
+  incident(`ATTACK: poisoned map data inserted a waypoint 300 m outside the area into D${i + 1}'s route`, 'attack');
+  return true;
+}
+// Decoys: false targets that look like anomalies to the camera. A second sensor sees nothing there.
+export function attackDecoy() {
+  const m = S.mission; m.decoys = m.decoys || [];
+  const open = S.P.cells.map((c, ci) => ci).filter(ci => !S.R.cov.has(ci));
+  if (!open.length) return false;
+  for (let k = 0; k < 3; k++) {
+    const c = S.P.cells[open[Math.floor(S.R.rng() * open.length)]].c;
+    m.decoys.push(S.P.fac ? { id: 1000 + m.decoys.length, u: c[0], z: c[1], decoy: true } : { id: 1000 + m.decoys.length, ll: S.P.f.toLL(c), decoy: true });
+  }
+  sec().decoys += 3;
+  incident('ATTACK: three decoy targets planted in unsurveyed ground', 'attack');
+  return true;
+}
+// Tainted firmware: the drone looks healthy but reports cells it never imaged. Secure boot refuses the unsigned update.
+export function attackFirmware(i) {
+  const d = S.R.d[i];
+  if (!d || d.lost || d.landed || d.tainted) return false;
+  if ((S.mission.def || {}).attest) {
+    sec().rejected++;
+    incident(`ATTACK: unsigned firmware pushed to D${i + 1}`, 'attack');
+    incident(`D${i + 1} secure boot refused the unsigned firmware update`, 'workaround');
+    return true;
+  }
+  d.tainted = true; d.fake = new Set(); sec().tainted++;
+  incident(`ATTACK: D${i + 1} was flashed with tampered firmware (it will report cells it never imaged)`, 'attack');
+  return true;
+}
+const truthOf = m => m.decoys && m.decoys.length ? m.hidden.concat(m.decoys) : m.hidden;
+function miscTick() {
+  const s = S.R.snoop;
+  if (s && S.R.t >= s.t1) { S.R.snoop = null; incident('The eavesdropper has gone', 'attack'); }
+}
+
 // --- Rogue drone ---
 // A hostile aircraft chases the nearest fleet drone. Within takeover range it tries to seize control over the unauthenticated radio
 // (stopped by signed commands); failing that it rams. Detect-and-avoid makes drones that sense it within ROGUE.sense evade.
@@ -247,6 +328,14 @@ export function send(src, dst, type, link, size, payload) {
   const msg = { t: S.R.t, src, dst, type, link, size, payload, seq: (S.R.seq[src] = (S.R.seq[src] || 0) + 1) };
   const st = m.stats;
   st.sent++; st.bytes[link] += size;
+  if (link !== 'mesh' && S.R.snoop && hypH(tp(S.R.d[di]), S.R.snoop.pos) <= S.R.snoop.r) {
+    if (m.def && m.def.encrypt) sec().sealed++;
+    else {
+      sec().leaked++;
+      if (type === 'REPORT') for (const it of payload.items) if (it.kind === 'det') S.R.snoop.ids.add(it.fid);
+      sec().leakedDet = S.R.snoop.ids.size;
+    }
+  }
   let why = null;
   if (link === 'mesh') { if (hyp(tp(S.R.d[src]), tp(S.R.d[dst])) > MESH_RANGE) why = 'out of range'; }
   else if (!m.faults[di][link] || jammed(di) || (jamHit(di) && !(m.def && m.def.hop))) why = 'link down';
@@ -290,8 +379,8 @@ export function onGcs(msg) {
       if (it.kind === 'cells') {
         for (const c of it.cells) if (!S.R.gcsCov.has(c)) { S.R.gcsCov.add(c); m.gcsCovered.push(c); hooks.paintCell(c, 2); }
       } else if (it.kind === 'det' && !m.found.some(f => f.id === it.fid)) {
-        const h = m.hidden.find(x => x.id === it.fid);
-        const fd = { id: it.fid, ll: h.ll, u: h.u, z: h.z, drone: msg.src, t: it.t, tc: S.R.t };
+        const h = truthOf(m).find(x => x.id === it.fid);
+        const fd = { id: it.fid, decoy: !!h.decoy, ll: h.ll, u: h.u, z: h.z, drone: msg.src, t: it.t, tc: S.R.t };
         m.found.push(fd); hooks.addFind(fd);
         hooks.log(`GCS confirmed anomaly #${it.fid} from D${msg.src + 1} (detected ${fmtT(it.t)}, via ${msg.link.toUpperCase()})`, 'detect');
       }
@@ -391,6 +480,8 @@ export function droneTick(d) {
     const step = m.params.speed * DT, dist = hyp(d.pos, S.P.base);
     if (dist <= step) { d.pos = S.P.base; d.landed = true; hooks.log(`D${i + 1} landed at base`, 'failsafe'); }
     else d.pos = d.pos.map((v, k) => v + (S.P.base[k] - v) * step / dist);
+  } else if (!d.rtl && floodBusy(d)) {
+    // command queue saturated: hover
   } else if (!d.rtl && evadeRogue(d)) {
     // detect-and-avoid: fly directly away from the unknown aircraft
   } else if (d.rejoin) {
@@ -432,6 +523,11 @@ export function droneTick(d) {
 }
 export function reportDetection(d, h) {
   d.detected.add(h.id);
+  if (h.decoy && (S.mission.def || {}).confirm) {
+    S.mission.sec.dismissed++;
+    hooks.log(`D${d.i + 1} camera flagged target #${h.id} but the second sensor sees nothing: dismissed as a decoy`, 'workaround');
+    return;
+  }
   d.outbox.push({ id: ++d.oid, kind: 'det', fid: h.id, t: S.R.t, sentAt: -1e9 });
   hooks.log(`D${d.i + 1} sensor detection: anomaly #${h.id} queued for report`, 'detect');
 }
@@ -448,11 +544,12 @@ export function senseFacade(d) {
     if (S.R.cov.has(ci)) continue;
     const [uc, zc] = S.P.cells[ci].c;
     if (Math.abs(uc - u) <= rx && Math.abs(zc - z) <= rz) {
+      if (d.tainted) { if (!d.fake.has(ci)) { d.fake.add(ci); d.newCells.push(ci); } continue; }
       S.R.cov.add(ci); m.covered.push(ci); d.newCells.push(ci);
       if (!S.R.gcsCov.has(ci)) hooks.paintCell(ci, 1);
     }
   }
-  for (const h of m.hidden) if (!d.detected.has(h.id) && Math.abs(h.u - u) <= rx && Math.abs(h.z - z) <= rz) reportDetection(d, h);
+  for (const h of truthOf(m)) if (!d.detected.has(h.id) && Math.abs(h.u - u) <= rx && Math.abs(h.z - z) <= rz) reportDetection(d, h);
 }
 export function sense(d) {
   if (S.P.fac) return senseFacade(d);
@@ -463,11 +560,12 @@ export function sense(d) {
     const ci = S.P.cellAt.get((i0 + a) * S.P.cols + (j0 + b));
     if (ci === undefined || S.R.cov.has(ci)) continue;
     if (hyp(S.P.cells[ci].c, P) <= reach) {
+      if (d.tainted) { if (!d.fake.has(ci)) { d.fake.add(ci); d.newCells.push(ci); } continue; }
       S.R.cov.add(ci); m.covered.push(ci); d.newCells.push(ci);
       if (!S.R.gcsCov.has(ci)) hooks.paintCell(ci, 1);
     }
   }
-  for (const h of m.hidden) {
+  for (const h of truthOf(m)) {
     if (d.detected.has(h.id)) continue;
     if (hyp(S.P.f.toXY(h.ll), P) <= sw / 2) reportDetection(d, h);
   }
@@ -537,12 +635,13 @@ export function step() {
   zillaTick();
   rogueTick();
   jamTick();
+  miscTick();
   deliver();
   S.R.d.forEach(droneTick);
   gcsTick();
   separationCheck();
   const idle = S.R.d.every(d => { const md = modeOf(d); return md === 'DONE' || md === 'LANDED' || md === 'LOST'; }) && S.R.g.every(g => !g.assigns.length);
-  if (!idle || S.R.zilla || S.R.rogue || S.R.jammer) { S.R.idleSince = null; return true; }
+  if (!idle || S.R.zilla || S.R.rogue || S.R.jammer || S.R.snoop) { S.R.idleSince = null; return true; }
   if (S.R.idleSince === null) S.R.idleSince = S.R.t;
   const drained = S.R.d.every(d => !d.outbox.length && !d.newCells.length);
   return !(drained || S.R.t - S.R.idleSince > 60);

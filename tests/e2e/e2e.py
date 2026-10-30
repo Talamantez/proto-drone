@@ -153,7 +153,25 @@ def test_survey_never_hidden_under_imagery(b, url):
     ctx.close()
 
 
-TESTS = [test_desktop_first_run, test_navigation, test_mobile, test_survey_never_hidden_under_imagery]
+def test_threats_and_report(b, url):
+    ctx = b.new_context(viewport={'width': 1300, 'height': 760})
+    pg, errs = page_with_errors(ctx)
+    pg.goto(url); pg.wait_for_timeout(1000); pg.keyboard.press('Escape')
+    pg.click('#btnDemo'); pg.wait_for_timeout(1500)
+    if pg.is_visible('#tour'): pg.keyboard.press('Escape')
+    assert pg.is_visible('#btnThreats')
+    pg.click('#btnThreats'); assert pg.is_visible('#threatMenu')
+    pg.click('#shieldSeg [data-lvl=full]'); assert pg.evaluate('__app.S.mission.def.attest === true && __app.S.mission.def.daa === true')
+    pg.click('#shieldSeg [data-lvl=off]'); assert pg.evaluate('!__app.S.mission.def.auth')
+    pg.click('#btnRun'); pg.wait_for_timeout(500)
+    pg.click('#threatItems button[data-i="0"]'); pg.wait_for_timeout(300)
+    assert pg.evaluate('__app.S.mission.sec.gps') == 1, 'GPS spoof launched from the menu'
+    pg.click('#btnReport'); assert pg.is_visible('#report') and 'security' in pg.inner_text('#report').lower()
+    assert not errs, errs
+    ctx.close()
+
+
+TESTS = [test_desktop_first_run, test_navigation, test_mobile, test_survey_never_hidden_under_imagery, test_threats_and_report]
 
 if __name__ == '__main__':
     failed = 0

@@ -21,6 +21,7 @@ import { LP } from './layerpanel.js';
 import './overlays.js';
 import './library.js';
 import './hud.js';
+import './threatmenu.js';
 import './sheet.js';
 import { initNav } from './nav.js';
 
