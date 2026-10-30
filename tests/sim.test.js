@@ -61,12 +61,29 @@ test('with every link cut for the whole run, the GCS confirms nothing', () => {
   assert.equal(S.R.gcsCov.size, 0); assert.equal(m.found.length, 0);
 });
 
+test('a drone that failsafed on lost links rejoins its survey when the links return', () => {
+  const m = makeMission();
+  run(60);
+  const d2 = S.R.d[1], at = m.dist[1];
+  m.faults[1].lte = m.faults[1].lora = false;
+  run(90);
+  assert.ok(d2.rtl || d2.landed, 'D2 went home');
+  m.faults[1].lte = m.faults[1].lora = true;
+  run(130);
+  assert.ok(!d2.rtl && !d2.landed, 'D2 relaunched');
+  run(600);
+  assert.ok(m.dist[1] > at, 'D2 continued along its path');
+  assert.ok(gcsPct() > 90);
+});
+
 test('a low battery sends a drone home', () => {
   const orig = hooks.battUsable;
   hooks.battUsable = () => 0.5;   // Wh: exhausted within seconds
   try {
     makeMission(); run(120);
     assert.ok(S.R.d.every(d => d.rtl || d.landed));
+    run(300);
+    assert.ok(S.R.d.every(d => d.landed), 'battery RTL never auto-resumes');
   } finally { hooks.battUsable = orig; }
 });
 
@@ -93,4 +110,44 @@ test('facade (wall) missions run too', () => {
   run();
   assert.ok(S.P.fac && gcsPct() > 80, `wall coverage ${gcsPct().toFixed(1)}%`);
   assert.ok(m.found.length > 0);
+});
+
+test('post-run report: coverage, gaps and a recon plan match the run', async () => {
+  const { buildReport } = await import('../js/report.js');
+  const m = makeMission(); run(30);
+  let r = buildReport(m, S.P, S.R);
+  assert.equal(r.verdict, 'INCOMPLETE');
+  assert.ok(r.gaps.length >= 1 && r.plan.some(p => p.kind === 'gap'));
+  assert.equal(r.gaps.reduce((s, g) => s + g.n, 0), r.total - r.cov);
+  run(3600); r = buildReport(m, S.P, S.R);
+  assert.equal(r.verdict, 'COMPLETE');
+  assert.ok(r.gaps.length === 0 && r.photos > 0 && r.drones.length === 3);
+});
+
+test('Godzilla: drones hold, lose the destroyed drone\'s work to the others, and the report accounts for it', async () => {
+  const { unleashGodzilla } = await import('../js/sim.js');
+  const { buildReport } = await import('../js/report.js');
+  const m = makeMission(); run(40);
+  assert.ok(unleashGodzilla());
+  run(3600);
+  assert.equal(S.R.zilla, null, 'the monster left');
+  assert.ok(m.incidents.length >= 2);
+  const r = buildReport(m, S.P, S.R);
+  assert.equal(r.incidents.length, m.incidents.length);
+  assert.ok(r.written >= 0 && r.gcsPct <= 100.01);
+  assert.ok(r.lost.length === 0 || m.assignN > 0 || S.R.d.every(d => d.lost || d.landed), 'lost work was reassigned or losses cut');
+});
+
+test('Godzilla stomping a drone destroys it, the GCS hands its work on, and the report lists the loss', async () => {
+  const { unleashGodzilla } = await import('../js/sim.js');
+  const { buildReport } = await import('../js/report.js');
+  const m = makeMission(); run(40);
+  unleashGodzilla();
+  S.R.zilla.pos = S.R.d[1].pos.slice();
+  run(3600);
+  assert.ok(S.R.d[1].lost);
+  assert.ok(m.assignN > 0, 'remaining work reassigned');
+  const r = buildReport(m, S.P, S.R);
+  assert.deepEqual(r.lost, [1]);
+  assert.ok(r.plan.some(p => p.kind === 'loss'));
 });

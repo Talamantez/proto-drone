@@ -12,6 +12,12 @@ It is a static site with no build step, but it uses ES modules, so serve it over
 npm run serve        # http://localhost:8000
 ```
 
+## Run behaviour
+
+- **Rejoin:** a drone that returns home on a link failsafe relaunches and rejoins its survey path when GCS heartbeats come back (low-battery returns do not rejoin).
+- **Report:** when a run ends (or from Export → Run report) you get coverage, gaps, a recon plan, fleet status, an incident timeline and simulated photo intake with a viewer. The frames are generated placeholders.
+- **Godzilla:** the map button sends a monster across a live area survey. It jams comms near it, destroys drones it reaches and tramples ground (written off). Drones hold clear, the GCS hands lost work to the others and cuts losses if nobody is left; all of it lands in the report.
+
 ## Test it
 
 ```

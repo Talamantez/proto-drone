@@ -60,6 +60,7 @@ export function build(preserve) {
   $('elevWrap').hidden = !S.P.fac;
   applyWeights(); drawPois();
   layers.finds = L.layerGroup().addTo(S.map);
+  if (layers.zilla) { S.map.removeLayer(layers.zilla); layers.zilla = null; }
 
   initRuntime(m);
   S.R.d.forEach((d, i) => {
