@@ -5,7 +5,7 @@ import { COLORS, TEL_BUDGET } from './constants.js';
 import { costs } from './controls.js';
 import { drawElev } from './mapview.js';
 import { layers } from './state.js';
-import { ZILLA, modeOf, nm } from './sim.js';
+import { ZILLA, modeOf, nm, tp } from './sim.js';
 import { renderChallenge } from './challenges.js';
 import { renderEventLog } from './eventlog.js';
 import { wpct } from './poi-ui.js';
@@ -13,7 +13,7 @@ import { wpct } from './poi-ui.js';
 export function renderUi(force) {
   if (!S.mission || !S.R) return;
   S.R.d.forEach((d, i) => {
-    const o = layers.d[i], ll = S.P.f.toLL(d.pos), g = S.R.g[i];
+    const o = layers.d[i], ll = S.P.f.toLL(tp(d)), g = S.R.g[i];
     o.tag.setLatLng(ll); o.trail.addLatLng(ll);
     o.link.setLatLngs([S.P.f.toLL(S.P.base), ll]).setStyle({ color: linkColor(d.link), dashArray: d.link ? null : '4 4' });
     o.belief.setLatLng(g.pos);
@@ -29,6 +29,10 @@ export function renderUi(force) {
     if (S.R.zilla) { const ll = S.P.f.toLL(S.R.zilla.pos); layers.zilla.eachLayer(l => l.setLatLng(ll)); }
     else { S.map.removeLayer(layers.zilla); layers.zilla = null; }
   }
+  if (S.R.rogue && !layers.rogue) layers.rogue = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="zilla-icon">🛸</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false }).addTo(S.map);
+  if (layers.rogue) { if (S.R.rogue) layers.rogue.setLatLng(S.P.f.toLL(S.R.rogue.pos)); else { S.map.removeLayer(layers.rogue); layers.rogue = null; } }
+  if (S.R.jammer && !layers.jammer) layers.jammer = L.circle([0, 0], { pane: 'p_survey', radius: S.R.jammer.r, color: '#ff7b72', weight: 2, dashArray: '2 5', fillOpacity: 0.12, interactive: false }).addTo(S.map);
+  if (layers.jammer) { if (S.R.jammer) layers.jammer.setLatLng(S.P.f.toLL(S.R.jammer.pos)); else { S.map.removeLayer(layers.jammer); layers.jammer = null; } }
   const now = performance.now();
   if (!force && now - S.R.lastUi < 250) return;
   S.R.lastUi = now;

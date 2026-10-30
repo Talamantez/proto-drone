@@ -116,6 +116,13 @@
     <label><span class="lora">LoRa loss</span><input type="range" id="pLoraLoss" min="0" max="60" value="5"><span class="val" id="vLoraLoss"></span></label>
     <div class="dim">LoRa ≈450±150 ms, carries heartbeat, position and detections only. Wi-Fi mesh ≈15 ms, 400 m range, drone↔drone.</div>
 
+    <h2>Shields</h2>
+    <div class="dim">Start with Shields off, launch a threat from the map's ⚔ Threats button, then turn them on and compare the reports.</div>
+    <details><summary>Fine-tune each shield</summary><div id="defList"></div></details>
+
+    <h2>Threat library</h2>
+    <div id="threatList"></div>
+
     <h2>Heritage pre-flight checklist (gates Start when profile is on)</h2>
     <div id="checks"></div>
 
@@ -181,7 +188,17 @@
         <button id="dbCancel" class="when-drawing">Cancel</button>
       </div>
     </div>
-    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div><button id="btnZilla" class="zilla" title="Unleash a monster: it jams comms, destroys drones in its path and tramples ground. Drones hold, reroute work and cut losses.">🦖 Godzilla</button></div>
+    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div></div>
+    <div id="threatBox" hidden>
+      <button id="btnThreats" class="atk">⚔ Threats</button>
+      <div id="threatMenu" hidden>
+        <div class="t">Shields</div>
+        <div id="shieldSeg"><button data-lvl="off">Off</button><button data-lvl="basic">Basic</button><button data-lvl="full">Full</button></div>
+        <div id="shieldCustom" class="dim" hidden>Custom mix (see Shields in the sidebar)</div>
+        <div class="t">Launch</div>
+        <div id="threatItems"></div>
+      </div>
+    </div>
   </div>
 </div>
 <div id="veil" hidden></div>

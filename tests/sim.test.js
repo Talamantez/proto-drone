@@ -151,3 +151,97 @@ test('Godzilla stomping a drone destroys it, the GCS hands its work on, and the 
   assert.deepEqual(r.lost, [1]);
   assert.ok(r.plan.some(p => p.kind === 'loss'));
 });
+
+test('GPS spoofing drags a drone off course; the GNSS integrity check limits it', async () => {
+  const { attackGps, SPOOF } = await import('../js/sim.js');
+  const err = d => Math.hypot(d.off[0], d.off[1]);
+  makeMission(); run(30); attackGps(0); run(80);
+  const bad = Math.max(S.mission.sec.maxErr, err(S.R.d[0]));
+  assert.ok(bad > 100, `undefended error ${bad}`);
+  const safe = makeMission(); safe.def.gnss = true; run(30); attackGps(0); run(80);
+  assert.ok(safe.sec.alarms === 1 && safe.sec.maxErr < SPOOF.tol + 5, `defended error ${safe.sec.maxErr}`);
+  run(3600);
+  assert.ok(S.R.d.every(d => err(d) < 0.1), 'position error recovers');
+});
+
+test('a forged RTL is obeyed unless commands are signed; the audit resumes the drone', async () => {
+  const { attackCmd } = await import('../js/sim.js');
+  makeMission(); run(30); attackCmd(1); run(40);
+  assert.ok(S.R.d[1].rtl || S.R.d[1].landed, 'unsigned order obeyed');
+  const a = makeMission(); a.def.auth = true; run(30); attackCmd(1); run(40);
+  assert.ok(!S.R.d[1].rtl && a.sec.rejected === 1, 'rejected');
+  const b = makeMission(); b.def.audit = true; run(30); attackCmd(1); run(80);
+  assert.ok(!S.R.d[1].rtl && !S.R.d[1].landed && b.sec.resumed === 1, 'audit resumed');
+});
+
+test('rogue drone: hijacks over an open radio, rams when commands are signed, evaded by detect-and-avoid', async () => {
+  const { unleashRogue } = await import('../js/sim.js');
+  const lostCount = () => S.R.d.filter(d => d.lost).length;
+  const a = makeMission(); run(30); unleashRogue(); run(400);
+  assert.ok(a.sec.hijacked >= 1 && lostCount() >= 1, 'undefended: a drone is stolen');
+  const b = makeMission(); b.def.auth = true; run(30); unleashRogue(); run(400);
+  assert.ok(b.sec.hijacked === 0 && b.sec.rejected >= 1 && b.sec.collisions >= 1, 'signed: takeover refused, but it still rams');
+  const c = makeMission(); c.def.auth = c.def.daa = true; run(30); unleashRogue(); run(400);
+  assert.ok(c.sec.hijacked === 0 && c.sec.collisions === 0 && c.sec.evasions >= 1 && lostCount() === 0, 'signed + detect-and-avoid: no losses');
+  run(3600);
+  assert.ok(S.R.rogue === null);
+});
+
+test('RF jamming forces failsafes; frequency hopping keeps contact', async () => {
+  const { attackJam } = await import('../js/sim.js');
+  const jamAll = () => { S.R.jammer.pos = S.P.base.slice(0, 2); S.R.jammer.r = 1e5; };
+  const a = makeMission(); run(30); attackJam(); jamAll(); run(70);
+  assert.ok(S.R.d.every(d => d.rtl || d.landed), 'undefended: every drone failsafes');
+  const b = makeMission(); b.def.hop = true; run(30); attackJam(); jamAll(); run(70);
+  assert.ok(S.R.d.some(d => !d.rtl && !d.landed), 'hopping: some stay in contact');
+  assert.ok(a.sec.jam === 1);
+});
+
+test('a replayed signed command beats signatures but not the freshness check', async () => {
+  const { attackReplay } = await import('../js/sim.js');
+  const a = makeMission(); a.def.auth = true; run(30); attackReplay(1); run(40);
+  assert.ok(S.R.d[1].rtl || S.R.d[1].landed, 'signed replay obeyed');
+  const b = makeMission(); b.def.auth = b.def.fresh = true; run(30); attackReplay(1); run(40);
+  assert.ok(!S.R.d[1].rtl && b.sec.rejected === 1, 'stale timestamp rejected');
+});
+
+test('eavesdropper reads traffic unless links are encrypted', async () => {
+  const { attackSnoop } = await import('../js/sim.js');
+  const go = enc => { const m = makeMission(); m.def.encrypt = enc; run(20); attackSnoop(); S.R.snoop.r = 1e5; run(120); return m.sec; };
+  const open = go(false); assert.ok(open.leaked > 10 && open.leakedDet >= 0 && open.sealed === 0);
+  const shut = go(true); assert.ok(shut.leaked === 0 && shut.sealed > 10);
+});
+
+test('a radio flood grounds a drone unless rate limiting is on', async () => {
+  const { attackFlood } = await import('../js/sim.js');
+  const run1 = rate => { const m = makeMission(); m.def.rate = rate; run(20); const at = m.dist[0]; attackFlood(0); run(50); return m.dist[0] - at; };
+  assert.ok(run1(false) < 5, 'flooded drone barely moves');
+  assert.ok(run1(true) > 100, 'rate-limited drone keeps flying');
+});
+
+test('bad map data sends a drone outside the area unless input is validated', async () => {
+  const { attackPoison } = await import('../js/sim.js');
+  const a = makeMission(); run(20); const before = S.R.d[0].total; attackPoison(0);
+  assert.ok(S.R.d[0].total > before + 300);
+  const b = makeMission(); b.def.validate = true; run(20); const t = S.R.d[0].total; attackPoison(0);
+  assert.equal(S.R.d[0].total, t); assert.ok(a.sec.poison === 1);
+});
+
+test('decoys fool the camera unless a second sensor confirms', async () => {
+  const { attackDecoy } = await import('../js/sim.js');
+  const { buildReport } = await import('../js/report.js');
+  const a = makeMission(); run(10); attackDecoy(); run(3600);
+  assert.ok(buildReport(a, S.P, S.R).falseAlarms > 0, 'decoys confirmed as real');
+  const b = makeMission(); b.def.confirm = true; run(10); attackDecoy(); run(3600);
+  assert.equal(buildReport(b, S.P, S.R).falseAlarms, 0); assert.ok(b.sec.dismissed > 0);
+});
+
+test('tampered firmware makes phantom coverage; secure boot refuses it', async () => {
+  const { attackFirmware } = await import('../js/sim.js');
+  const { buildReport } = await import('../js/report.js');
+  const a = makeMission(); run(10); attackFirmware(1); run(3600);
+  const r = buildReport(a, S.P, S.R);
+  assert.ok(r.phantom > 0 && r.verdict !== 'COMPLETE', `phantom ${r.phantom} ${r.verdict}`);
+  const b = makeMission(); b.def.attest = true; run(10); attackFirmware(1); run(3600);
+  assert.equal(buildReport(b, S.P, S.R).phantom, 0);
+});

@@ -4,6 +4,7 @@ import { S } from './state.js';
 import { mulberry32 } from './planner.js';
 import { buildReport } from './report.js';
 import { flyTo } from './nav.js';
+import { DEFS } from './defences.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 
@@ -66,7 +67,7 @@ export function openReport() {
   const stat = (k, v) => `<div><b>${v}</b><span>${k}</span></div>`;
   card.append(el('div', 'stats',
     stat('GCS-confirmed coverage', r.gcsPct.toFixed(0) + '%') + stat('Ground-truth coverage', r.covPct.toFixed(0) + '%') +
-    stat('Gaps', r.gaps.length) + (r.written ? stat('Cells written off', r.written) : '') + (r.lost.length ? stat('Drones lost', r.lost.length) : '') + stat('Anomalies confirmed', `${r.found.length}/${r.hiddenTotal}`) +
+    stat('Gaps', r.gaps.length) + (r.written ? stat('Cells written off', r.written) : '') + (r.phantom ? stat('Phantom coverage', r.phantom) : '') + (r.falseAlarms ? stat('False alarms', r.falseAlarms) : '') + (r.lost.length ? stat('Drones lost', r.lost.length) : '') + stat('Anomalies confirmed', `${r.found.length}/${r.hiddenTotal}`) +
     stat('Photos captured (est.)', r.photos) + stat('Run time', fmtT(r.simT))));
 
   const body = el('div', 'cols'); card.append(body);
@@ -90,6 +91,12 @@ export function openReport() {
   right.append(el('div', 'dim', r.drones.map(d => `D${d.i + 1}: ${d.mode}, ${(d.progress * 100).toFixed(0)}% of path, ${d.flightMin.toFixed(1)} min, ${d.wh.toFixed(0)} Wh`).join('<br>')));
   if (r.alerts) right.append(el('div', 'dim', `${r.alerts} separation alert${r.alerts > 1 ? 's' : ''} logged.`));
 
+  if (r.attacked) {
+    const on = DEFS.filter(d => r.defences[d.key]).map(d => d.label.toLowerCase());
+    card.append(el('h4', null, 'Security'));
+    card.append(el('div', 'dim', `Attacks: ${r.sec.gps} GPS spoof, ${r.sec.cmd} forged command, ${r.sec.rogue || 0} rogue drone, ${r.sec.jam || 0} RF jammer, ${r.sec.replay || 0} replay, ${r.sec.snoop || 0} eavesdropper, ${r.sec.flood || 0} flood, ${r.sec.poison || 0} bad-data, ${r.sec.decoys || 0} decoys, ${r.sec.tainted || 0} bad firmware. Defences on: ${on.length ? on.join(', ') : 'none'}.<br>` +
+      `GNSS alarms ${r.sec.alarms}, forged commands rejected ${r.sec.rejected}, drones resumed by GCS ${r.sec.resumed}, worst position error ${Math.round(r.sec.maxErr)} m.<br>Messages exposed ${r.sec.leaked || 0} (${r.sec.leakedDet || 0} anomaly locations), sealed ${r.sec.sealed || 0}, decoys dismissed ${r.sec.dismissed || 0}.`));
+  }
   if (r.incidents.length) {
     card.append(el('h4', null, 'Incident timeline'));
     card.append(el('ul', 'timeline', r.incidents.map(x => `<li class="${x.kind}">${fmtT(x.t)} · ${esc(x.text)}</li>`).join('')));

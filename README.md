@@ -17,6 +17,7 @@ npm run serve        # http://localhost:8000
 - **Rejoin:** a drone that returns home on a link failsafe relaunches and rejoins its survey path when GCS heartbeats come back (low-battery returns do not rejoin).
 - **Report:** when a run ends (or from Export → Run report) you get coverage, gaps, a recon plan, fleet status, an incident timeline and simulated photo intake with a viewer. The frames are generated placeholders.
 - **Godzilla:** the map button sends a monster across a live area survey. It jams comms near it, destroys drones it reaches and tramples ground (written off). Drones hold clear, the GCS hands lost work to the others and cuts losses if nobody is left; all of it lands in the report.
+- **Threats:** one ⚔ Threats button on the map opens a menu of 11 scenarios (GPS spoof, forged RTL, replay, RF jammer, rogue drone, eavesdropper, radio flood, bad map data, decoys, bad firmware, Godzilla) plus 🎲 Surprise me. The same menu has a **Shields** switch (Off / Basic / Full); fine-tune individual shields in the sidebar. Start with Shields off, launch a threat, then turn them on and compare the reports. The report's Security section lists attacks, defences and what each cost you; the sidebar Threat library explains every threat and its defence.
 
 ## Test it
 
