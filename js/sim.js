@@ -20,7 +20,7 @@ export function resetRun(m) {
   Object.assign(m, {
     dist: [], covered: [], gcsCovered: [], found: [], dr: [], gs: [], simT: 0, alerts: 0, status: 'planned',
     stats: freshStats(), assignN: 0, faults: Array.from({ length: m.params.n }, () => ({ lte: true, lora: true })),
-    checks: [], fired: [], incidents: [], written: [],
+    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false }, sec: { gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
   });
 }
 export function scatter(m) {
@@ -66,7 +66,7 @@ export function initRuntime(m) {
     if (m.dist[i] === undefined) m.dist[i] = 0;
     const d = {
       i, path, cum, total: cum[cum.length - 1], extra: (sv.extra || []).slice(), applied: new Set(sv.applied || []),
-      lost: !!sv.lost, rtl: !!sv.rtl, rtlWhy: sv.rtlWhy || null, rejoin: !!sv.rejoin, landed: !!sv.landed, wh: sv.wh || 0, flightT: sv.flightT || 0, detected: new Set(sv.detected || []),
+      off: sv.off || [0, 0], spoof: sv.spoof || null, gnssAlarm: !!sv.gnssAlarm, lost: !!sv.lost, rtl: !!sv.rtl, rtlWhy: sv.rtlWhy || null, rejoin: !!sv.rejoin, landed: !!sv.landed, wh: sv.wh || 0, flightT: sv.flightT || 0, detected: new Set(sv.detected || []),
       outbox: (sv.outbox || []).map(it => ({ ...it, sentAt: -1e9 })), newCells: [], oid: sv.oid || 0,
       lastGcs: { lte: S.R.t, lora: S.R.t }, link: 'lte', peers: {}, advAt: {},
       nextHb: S.R.t, nextTel: S.R.t, nextMesh: S.R.t, nextRep: S.R.t,
@@ -92,7 +92,7 @@ export function linkModel(link) {
 }
 // Godzilla: a roaming exclusion zone. Drones inside the jam radius lose LTE and LoRa; inside the kill radius they are destroyed.
 export const ZILLA = { speed: 2.5, kill: 35, jam: 140, avoid: 90 };
-const jammed = di => !!S.R.zilla && hypH(S.R.d[di].pos, S.R.zilla.pos) <= ZILLA.jam;
+const jammed = di => !!S.R.zilla && hypH(tp(S.R.d[di]), S.R.zilla.pos) <= ZILLA.jam;
 export function incident(text, kind = 'zilla') {
   S.mission.incidents.push({ t: S.R.t, kind, text });
   hooks.log(text, 'fault');
@@ -108,6 +108,46 @@ export function unleashGodzilla() {
   incident('GODZILLA attacks from the edge of the survey area, heading for the middle', 'zilla');
   return true;
 }
+// --- Spoofing ---
+// GPS spoofing drags a drone's real position away from where its navigation thinks it is, at SPOOF.rate m/s for SPOOF.dur s.
+// Defences: gnss = inertial / visual cross-check of the GNSS fix; auth = commands must be signed; audit = GCS notices an unexplained RTL and orders a signed resume.
+export const SPOOF = { rate: 2, dur: 90, tol: 15 };
+const sec = () => S.mission.sec || (S.mission.sec = { gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 });
+export function attackGps(i) {
+  const d = S.R.d[i];
+  if (!d || d.lost || d.landed || d.spoof) return false;
+  const a = S.R.rng() * 2 * Math.PI;
+  d.spoof = { dir: [Math.cos(a), Math.sin(a)], t1: S.R.t + SPOOF.dur };
+  sec().gps++;
+  incident(`ATTACK: GPS spoofing against D${i + 1} (nav fix is being dragged ${SPOOF.rate} m/s)`, 'attack');
+  return true;
+}
+export function attackCmd(i) {
+  const d = S.R.d[i];
+  if (!d || d.lost || d.landed) return false;
+  const st = S.mission.stats;
+  st.sent++; st.bytes.lora += 20;
+  S.R.queue.push({ t: S.R.t, src: 'ATK', dst: i, type: 'CMD', link: 'lora', size: 20, payload: { cmd: 'RTL', signed: false }, seq: 0, deliverAt: S.R.t + 0.5 });
+  sec().cmd++;
+  incident(`ATTACK: forged "return to launch" command sent to D${i + 1} over LoRa, posing as the GCS`, 'attack');
+  return true;
+}
+function spoofTick(d) {
+  const s = d.spoof, def = S.mission.def || {};
+  if (s && S.R.t < s.t1) { d.off = [d.off[0] + s.dir[0] * SPOOF.rate * DT, d.off[1] + s.dir[1] * SPOOF.rate * DT]; }
+  else {
+    if (s) { d.spoof = null; incident(`GPS spoofing against D${d.i + 1} has stopped`, 'attack'); }
+    const e = Math.hypot(d.off[0], d.off[1]);
+    if (e > 0) { const k = Math.max(0, e - (d.gnssAlarm ? 3 : 1) * DT) / e; d.off = e < 0.05 ? [0, 0] : [d.off[0] * k, d.off[1] * k]; }
+    else d.gnssAlarm = false;
+  }
+  const err = Math.hypot(d.off[0], d.off[1]);
+  if (err > sec().maxErr) sec().maxErr = err;
+  if (def.gnss && s && !d.gnssAlarm && err >= SPOOF.tol) {
+    d.gnssAlarm = true; d.spoof = null; sec().alarms++;
+    incident(`D${d.i + 1} GNSS integrity alarm: fix disagrees with inertial/visual navigation by ${err.toFixed(0)} m; GNSS rejected, flying on visual-inertial and correcting`, 'workaround');
+  }
+}
 function zillaTick() {
   const z = S.R.zilla, m = S.mission;
   if (!z) return;
@@ -118,7 +158,7 @@ function zillaTick() {
     if (!S.R.cov.has(ci) && !m.written.includes(ci) && hypH(c.c, z.pos) <= ZILLA.kill) m.written.push(ci);
   });
   for (const d of S.R.d) {
-    if (d.lost || d.landed || hypH(d.pos, z.pos) > ZILLA.kill) continue;
+    if (d.lost || d.landed || hypH(tp(d), z.pos) > ZILLA.kill) continue;
     d.lost = true; d.landed = true; d.hold = false;
     incident(`D${d.i + 1} destroyed by Godzilla at ${fmtT(S.R.t)}`, 'loss');
   }
@@ -128,14 +168,16 @@ function zillaTick() {
     incident(`Godzilla has left the area; ${m.written.length} cells trampled and written off`, 'zilla');
   }
 }
-export const nm = x => x === 'G' ? 'GCS' : 'D' + (x + 1);
+export const nm = x => x === 'G' ? 'GCS' : typeof x === 'string' ? x : 'D' + (x + 1);
+// True position: where the airframe really is. d.pos is where its navigation believes it is; a GPS spoofer makes them differ.
+export const tp = d => (d.off[0] || d.off[1]) ? [d.pos[0] + d.off[0], d.pos[1] + d.off[1], d.pos[2]] : d.pos;
 export function send(src, dst, type, link, size, payload) {
   const m = S.mission, di = typeof src === 'number' ? src : dst;
   const msg = { t: S.R.t, src, dst, type, link, size, payload, seq: (S.R.seq[src] = (S.R.seq[src] || 0) + 1) };
   const st = m.stats;
   st.sent++; st.bytes[link] += size;
   let why = null;
-  if (link === 'mesh') { if (hyp(S.R.d[src].pos, S.R.d[dst].pos) > MESH_RANGE) why = 'out of range'; }
+  if (link === 'mesh') { if (hyp(tp(S.R.d[src]), tp(S.R.d[dst])) > MESH_RANGE) why = 'out of range'; }
   else if (!m.faults[di][link] || jammed(di)) why = 'link down';
   const lm = linkModel(link);
   if (!why && S.R.rng() < lm.loss) why = 'loss';
@@ -204,10 +246,22 @@ export function onDrone(d, msg) {
       hooks.log(`D${d.i + 1} accepted ${a.id}: +${a.pts.length} waypoints from D${a.from + 1}`, 'assign');
     }
     send(d.i, 'G', 'ASSIGN_ACK', msg.link, 12, { id: a.id });
+  } else if (msg.type === 'CMD') {
+    const c = msg.payload, def = S.mission.def || {};
+    if (!c.signed && def.auth) {
+      sec().rejected++;
+      incident(`D${d.i + 1} rejected an unsigned ${c.cmd} command (authentication)`, 'workaround');
+    } else if (c.cmd === 'RTL' && !d.rtl && !d.landed) {
+      d.rtl = true; d.rtlWhy = 'cmd';
+      hooks.log(`D${d.i + 1} obeyed ${c.signed ? 'signed' : 'UNSIGNED'} RTL command, returning to base`, 'failsafe');
+    } else if (c.cmd === 'RESUME' && d.rtlWhy === 'cmd') {
+      d.rtl = false; d.rtlWhy = null; d.landed = false; d.rejoin = true; sec().resumed++;
+      incident(`D${d.i + 1} accepted signed RESUME, relaunching to its survey path`, 'workaround');
+    }
   } else if (msg.type === 'MESH_POS') {
     d.peers[msg.src] = msg.payload;
     const p = msg.payload;
-    const dh = hypH(S.P.f.toXY(p.ll), d.pos), dv = Math.abs(p.alt - altOf(d));
+    const dh = hypH(S.P.f.toXY(p.ll), tp(d)), dv = Math.abs(p.alt - altOf(d));
     if (dh < SEP_H * 2 && dv < SEP_V && S.R.t - (d.advAt[msg.src] || -1e9) > 10) {
       d.advAt[msg.src] = S.R.t;
       hooks.log(`D${d.i + 1} mesh advisory: D${msg.src + 1} ${dh.toFixed(0)} m, Δalt ${dv.toFixed(0)} m (peer data age ${((S.R.t - p.ts) * 1000).toFixed(0)} ms)`, 'advisory');
@@ -225,6 +279,7 @@ function holdForZilla(d) {
 export function droneTick(d) {
   const m = S.mission, i = d.i;
   if (d.lost) return;
+  spoofTick(d);
   const age = l => S.R.t - d.lastGcs[l];
   d.link = age('lte') < LINK_FRESH ? 'lte' : age('lora') < LINK_FRESH ? 'lora' : null;
   const mode = modeOf(d);
@@ -299,9 +354,9 @@ export function reportDetection(d, h) {
 }
 // A cell counts as captured when its centre is in the central part of the frame and the drone is at standoff.
 export function senseFacade(d) {
-  const m = S.mission, F = S.P.fac, rx = FRAME_USE * F.c.fw, rz = FRAME_USE * F.c.fh;
-  const u = (d.pos[0] - F.A[0]) * F.t[0] + (d.pos[1] - F.A[1]) * F.t[1], z = d.pos[2];
-  const s = (d.pos[0] - F.A[0]) * F.nr[0] + (d.pos[1] - F.A[1]) * F.nr[1];
+  const m = S.mission, F = S.P.fac, P = tp(d), rx = FRAME_USE * F.c.fw, rz = FRAME_USE * F.c.fh;
+  const u = (P[0] - F.A[0]) * F.t[0] + (P[1] - F.A[1]) * F.t[1], z = P[2];
+  const s = (P[0] - F.A[0]) * F.nr[0] + (P[1] - F.A[1]) * F.nr[1];
   if (Math.abs(s - F.c.stand) > Math.max(1, 0.15 * F.c.stand)) return;
   const j0 = Math.max(0, Math.floor((u - rx) / F.cs)), j1 = Math.min(F.cols - 1, Math.floor((u + rx) / F.cs));
   const i0 = Math.max(0, Math.floor((z - rz) / F.cs)), i1 = Math.min(F.rows - 1, Math.floor((z + rz) / F.cs));
@@ -318,20 +373,20 @@ export function senseFacade(d) {
 }
 export function sense(d) {
   if (S.P.fac) return senseFacade(d);
-  const m = S.mission, sw = m.params.swath, reach = sw * 0.6;
-  const [u, v] = rot(d.pos, S.P.th);
+  const m = S.mission, sw = m.params.swath, reach = sw * 0.6, P = tp(d);
+  const [u, v] = rot(P, S.P.th);
   const j0 = Math.floor((u - S.P.umin) / sw), i0 = Math.floor((v - S.P.vmin) / sw);
   for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
     const ci = S.P.cellAt.get((i0 + a) * S.P.cols + (j0 + b));
     if (ci === undefined || S.R.cov.has(ci)) continue;
-    if (hyp(S.P.cells[ci].c, d.pos) <= reach) {
+    if (hyp(S.P.cells[ci].c, P) <= reach) {
       S.R.cov.add(ci); m.covered.push(ci); d.newCells.push(ci);
       if (!S.R.gcsCov.has(ci)) hooks.paintCell(ci, 1);
     }
   }
   for (const h of m.hidden) {
     if (d.detected.has(h.id)) continue;
-    if (hyp(S.P.f.toXY(h.ll), d.pos) <= sw / 2) reportDetection(d, h);
+    if (hyp(S.P.f.toXY(h.ll), P) <= sw / 2) reportDetection(d, h);
   }
 }
 export function gcsTick() {
@@ -339,6 +394,16 @@ export function gcsTick() {
     if (S.R.t >= g.nextHb) { g.nextHb = S.R.t + HB_T; for (const l of ['lte', 'lora']) send('G', i, 'GCS_HB', l, 21, {}); }
     const age = S.R.t - g.lastRx, st = age < LINK_FRESH ? 'OK' : age < GCS_LOST ? 'DEGRADED' : 'LOST';
     if (st !== g.state) { hooks.log(`GCS: D${i + 1} ${g.state} → ${st} (silent ${age.toFixed(1)} s)`, 'link'); g.state = st; }
+    if (S.mission.def && S.mission.def.audit && g.mode === 'RTL' && st === 'OK' && S.R.d[i].rtlWhy === 'cmd') {
+      // an RTL nobody ordered, on a healthy link: ask for a signed resume and hold off reassigning
+      g.nextTry = Math.max(g.nextTry, S.R.t + 10);
+      if (S.R.t - (g.auditAt ?? -1e9) > 3) {
+        if (g.auditAt === undefined) incident(`GCS audit: D${i + 1} is returning home on a healthy link with no GCS order; sending a signed RESUME`, 'workaround');
+        g.auditAt = S.R.t;
+        for (const l of ['lte', 'lora']) send('G', i, 'CMD', l, 24, { cmd: 'RESUME', signed: true });
+      }
+    }
+    if (g.auditAt !== undefined && g.mode !== 'RTL') g.auditAt = undefined;
     if ((st === 'LOST' || g.mode === 'RTL' || g.mode === 'LANDED') && !g.reassigned && S.R.t >= g.nextTry) tryReassign(i);
     for (const a of g.assigns) if (S.R.t - a.sentAt > ACK_RTO) {
       a.sentAt = S.R.t;
@@ -369,9 +434,9 @@ export function separationCheck() {
   for (let a = 0; a < ds.length; a++) for (let b = a + 1; b < ds.length; b++) {
     if (ds[a].landed || ds[b].landed) continue;
     // launch / recovery share one pad column; real crews sequence these, which the sim does not model
-    if (S.P.fac && hypH(ds[a].pos, S.P.base) < 8 && hypH(ds[b].pos, S.P.base) < 8) continue;
+    if (S.P.fac && hypH(tp(ds[a]), S.P.base) < 8 && hypH(tp(ds[b]), S.P.base) < 8) continue;
     const key = a + '-' + b;
-    const bad = hypH(ds[a].pos, ds[b].pos) < SEP_H && Math.abs(altOf(ds[a]) - altOf(ds[b])) < SEP_V;
+    const bad = hypH(tp(ds[a]), tp(ds[b])) < SEP_H && Math.abs(altOf(ds[a]) - altOf(ds[b])) < SEP_V;
     if (bad && !S.R.sepActive.has(key)) { S.R.sepActive.add(key); m.alerts++; hooks.log(`Separation violation D${a + 1}/D${b + 1}`, 'sep'); }
     else if (!bad) S.R.sepActive.delete(key);
   }

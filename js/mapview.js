@@ -3,7 +3,7 @@ import { $, fmtT } from './util.js';
 import { COLORS } from './constants.js';
 import { S, layers } from './state.js';
 import { applyWeights, drawPois } from './poi-ui.js';
-import { cumAt, initRuntime, planMission } from './sim.js';
+import { cumAt, initRuntime, planMission, tp } from './sim.js';
 import { renderUi } from './render.js';
 
 export function clearMission() {
@@ -37,7 +37,7 @@ export function drawElev() {
   g.drawImage(elevOff, 0, 0, F.cols * F.cs * sx, F.rows * F.cs * sy); g.restore();
   const dot = (u, z, col, r) => { g.beginPath(); g.arc(u * sx, cv.height - z * sy, r, 0, 7); g.fillStyle = col; g.fill(); };
   S.mission.found.forEach(f => dot(f.u, f.z, '#c4524d', 3));
-  S.R.d.forEach((d, i) => dot((d.pos[0] - F.A[0]) * F.t[0] + (d.pos[1] - F.A[1]) * F.t[1], d.pos[2], COLORS[i % COLORS.length], 4));
+  S.R.d.forEach((d, i) => dot((tp(d)[0] - F.A[0]) * F.t[0] + (tp(d)[1] - F.A[1]) * F.t[1], d.pos[2], COLORS[i % COLORS.length], 4));
 }
 export function build(preserve) {
   clearMission();

@@ -72,11 +72,16 @@ export function buildReport(m, P, R) {
   if (undetected.length && gaps.length) plan.push({ kind: 'note', text: 'Anomalies may still be hiding in the gaps; re-assess after the recon flight' });
   if (lost.length) plan.push({ kind: 'loss', text: `Replace ${lost.map(i => 'D' + (i + 1)).join(', ')} (destroyed); recover or write off the airframe${lost.length > 1 ? 's' : ''}` });
   if (wr.size) plan.push({ kind: 'writeoff', text: `${wr.size} cells were trampled and are written off; re-survey them after the area is cleared and reopened` });
+  const sec = m.sec || { gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 }, def = m.def || {};
+  const attacked = sec.gps + sec.cmd > 0, defended = Object.values(def).some(Boolean);
+  if (attacked && !def.gnss && sec.gps) plan.push({ kind: 'sec', text: 'Enable the GNSS integrity check: a spoofed fix dragged a drone up to ' + Math.round(sec.maxErr) + ' m off its path unnoticed' });
+  if (attacked && !def.auth && sec.cmd) plan.push({ kind: 'sec', text: 'Require signed commands: an unsigned forged order was obeyed' });
+  if (attacked && sec.cmd && def.auth && !sec.rejected) plan.push({ kind: 'sec', text: 'Forged command not seen as rejected; check the radio logs' });
   const reconS = gaps.reduce((s, g) => s + g.flightS, 0);
 
   return {
     verdict, total, cov, gcs, covPct: 100 * (total ? cov / total : 1), gcsPct: 100 * gcsFrac,
     gaps, unconfirmed, found, heldOnDrone, undetected, hiddenTotal: m.hidden.length,
-    lost, incidents, written: wr.size, photos, flownM: flown, drones, plan, reconS, simT: m.simT, alerts: m.alerts, fac, cs,
+    sec, defences: def, attacked, defended, lost, incidents, written: wr.size, photos, flownM: flown, drones, plan, reconS, simT: m.simT, alerts: m.alerts, fac, cs,
   };
 }

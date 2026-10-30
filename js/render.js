@@ -5,7 +5,7 @@ import { COLORS, TEL_BUDGET } from './constants.js';
 import { costs } from './controls.js';
 import { drawElev } from './mapview.js';
 import { layers } from './state.js';
-import { ZILLA, modeOf, nm } from './sim.js';
+import { ZILLA, modeOf, nm, tp } from './sim.js';
 import { renderChallenge } from './challenges.js';
 import { renderEventLog } from './eventlog.js';
 import { wpct } from './poi-ui.js';
@@ -13,7 +13,7 @@ import { wpct } from './poi-ui.js';
 export function renderUi(force) {
   if (!S.mission || !S.R) return;
   S.R.d.forEach((d, i) => {
-    const o = layers.d[i], ll = S.P.f.toLL(d.pos), g = S.R.g[i];
+    const o = layers.d[i], ll = S.P.f.toLL(tp(d)), g = S.R.g[i];
     o.tag.setLatLng(ll); o.trail.addLatLng(ll);
     o.link.setLatLngs([S.P.f.toLL(S.P.base), ll]).setStyle({ color: linkColor(d.link), dashArray: d.link ? null : '4 4' });
     o.belief.setLatLng(g.pos);

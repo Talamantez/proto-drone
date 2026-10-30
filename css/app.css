@@ -169,3 +169,5 @@ button.cta:hover:not(:disabled) { background: #5bf09b; border-color: #b4ffd3; }
 #report .timeline li { padding: 2px 0 2px 8px; border-left: 3px solid var(--line); }
 #report .timeline li.loss { border-color: var(--bad); } #report .timeline li.zilla { border-color: var(--warn); } #report .timeline li.workaround { border-color: var(--ok); }
 .zilla-icon { font-size: 30px; line-height: 30px; text-align: center; filter: drop-shadow(0 0 6px #d4605a); }
+#hudFaults .atk { width: 100%; margin-top: 6px; background: #3b2a12; border-color: #d9a441; color: #ffe6b3; font-weight: 700; }
+#report .timeline li.attack { border-color: #ff7b72; }

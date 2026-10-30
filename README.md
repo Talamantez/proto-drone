@@ -17,6 +17,7 @@ npm run serve        # http://localhost:8000
 - **Rejoin:** a drone that returns home on a link failsafe relaunches and rejoins its survey path when GCS heartbeats come back (low-battery returns do not rejoin).
 - **Report:** when a run ends (or from Export → Run report) you get coverage, gaps, a recon plan, fleet status, an incident timeline and simulated photo intake with a viewer. The frames are generated placeholders.
 - **Godzilla:** the map button sends a monster across a live area survey. It jams comms near it, destroys drones it reaches and tramples ground (written off). Drones hold clear, the GCS hands lost work to the others and cuts losses if nobody is left; all of it lands in the report.
+- **Spoofing:** 🛰 GPS spoof drags one drone's real position away from what its navigation believes (the dashed belief ring shows the gap); 🎭 Forged RTL injects an unsigned return-to-launch over LoRa. Three defences can be toggled: GNSS integrity check, signed commands, and a GCS audit that orders a signed resume. The report shows attacks, alarms and rejections.
 
 ## Test it
 

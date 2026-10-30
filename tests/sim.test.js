@@ -151,3 +151,25 @@ test('Godzilla stomping a drone destroys it, the GCS hands its work on, and the 
   assert.deepEqual(r.lost, [1]);
   assert.ok(r.plan.some(p => p.kind === 'loss'));
 });
+
+test('GPS spoofing drags a drone off course; the GNSS integrity check limits it', async () => {
+  const { attackGps, SPOOF } = await import('../js/sim.js');
+  const err = d => Math.hypot(d.off[0], d.off[1]);
+  makeMission(); run(30); attackGps(0); run(80);
+  const bad = Math.max(S.mission.sec.maxErr, err(S.R.d[0]));
+  assert.ok(bad > 100, `undefended error ${bad}`);
+  const safe = makeMission(); safe.def.gnss = true; run(30); attackGps(0); run(80);
+  assert.ok(safe.sec.alarms === 1 && safe.sec.maxErr < SPOOF.tol + 5, `defended error ${safe.sec.maxErr}`);
+  run(3600);
+  assert.ok(S.R.d.every(d => err(d) < 0.1), 'position error recovers');
+});
+
+test('a forged RTL is obeyed unless commands are signed; the audit resumes the drone', async () => {
+  const { attackCmd } = await import('../js/sim.js');
+  makeMission(); run(30); attackCmd(1); run(40);
+  assert.ok(S.R.d[1].rtl || S.R.d[1].landed, 'unsigned order obeyed');
+  const a = makeMission(); a.def.auth = true; run(30); attackCmd(1); run(40);
+  assert.ok(!S.R.d[1].rtl && a.sec.rejected === 1, 'rejected');
+  const b = makeMission(); b.def.audit = true; run(30); attackCmd(1); run(80);
+  assert.ok(!S.R.d[1].rtl && !S.R.d[1].landed && b.sec.resumed === 1, 'audit resumed');
+});
