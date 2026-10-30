@@ -19,6 +19,7 @@ npm run serve        # http://localhost:8000
 - **Godzilla:** the map button sends a monster across a live area survey. It jams comms near it, destroys drones it reaches and tramples ground (written off). Drones hold clear, the GCS hands lost work to the others and cuts losses if nobody is left; all of it lands in the report.
 - **Spoofing:** 🛰 GPS spoof drags one drone's real position away from what its navigation believes (the dashed belief ring shows the gap); 🎭 Forged RTL injects an unsigned return-to-launch over LoRa. Three defences can be toggled: GNSS integrity check, signed commands, and a GCS audit that orders a signed resume. The report shows attacks, alarms and rejections.
 - **Rogue drone:** 🛸 sends a hostile aircraft after the fleet. Without signed commands it hijacks a drone; with them it rams instead; detect-and-avoid makes drones evade. The sidebar Threat library lists these and the roadmap threats with their defences.
+- **Jamming and replay:** 📻 puts a jammer on the map (links inside die, or turn lossy with frequency hopping); ⏪ replays a validly signed RTL, which signatures alone do not stop, only the freshness check does.
 
 ## Test it
 

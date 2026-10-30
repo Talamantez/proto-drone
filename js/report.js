@@ -73,9 +73,11 @@ export function buildReport(m, P, R) {
   if (lost.length) plan.push({ kind: 'loss', text: `Replace ${lost.map(i => 'D' + (i + 1)).join(', ')} (destroyed); recover or write off the airframe${lost.length > 1 ? 's' : ''}` });
   if (wr.size) plan.push({ kind: 'writeoff', text: `${wr.size} cells were trampled and are written off; re-survey them after the area is cleared and reopened` });
   const sec = m.sec || { gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 }, def = m.def || {};
-  const attacked = sec.gps + sec.cmd + (sec.rogue || 0) > 0, defended = Object.values(def).some(Boolean);
+  const attacked = sec.gps + sec.cmd + (sec.rogue || 0) + (sec.jam || 0) + (sec.replay || 0) > 0, defended = Object.values(def).some(Boolean);
   if (sec.hijacked && !def.auth) plan.push({ kind: 'sec', text: `${sec.hijacked} drone(s) were hijacked over an unauthenticated link: require signed commands on every radio, mesh included` });
   if (sec.collisions && !def.daa) plan.push({ kind: 'sec', text: 'Add detect-and-avoid (remote-ID roster, radar or ADS-B in) so drones can evade unknown aircraft' });
+  if (sec.jam && !def.hop) plan.push({ kind: 'sec', text: 'RF jamming cut the links: add frequency hopping, a second link type and mesh relay so drones keep contact' });
+  if (sec.replay && !def.fresh) plan.push({ kind: 'sec', text: 'A replayed signed command was obeyed: signatures alone do not stop replay, add timestamps or sequence numbers' });
   if (attacked && !def.gnss && sec.gps) plan.push({ kind: 'sec', text: 'Enable the GNSS integrity check: a spoofed fix dragged a drone up to ' + Math.round(sec.maxErr) + ' m off its path unnoticed' });
   if (attacked && !def.auth && sec.cmd) plan.push({ kind: 'sec', text: 'Require signed commands: an unsigned forged order was obeyed' });
   if (attacked && sec.cmd && def.auth && !sec.rejected) plan.push({ kind: 'sec', text: 'Forged command not seen as rejected; check the radio logs' });

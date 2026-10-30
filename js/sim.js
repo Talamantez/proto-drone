@@ -20,7 +20,7 @@ export function resetRun(m) {
   Object.assign(m, {
     dist: [], covered: [], gcsCovered: [], found: [], dr: [], gs: [], simT: 0, alerts: 0, status: 'planned',
     stats: freshStats(), assignN: 0, faults: Array.from({ length: m.params.n }, () => ({ lte: true, lora: true })),
-    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false, daa: false }, sec: { rogue: 0, hijacked: 0, collisions: 0, evasions: 0, gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
+    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false, daa: false, hop: false, fresh: false }, sec: { jam: 0, replay: 0, rogue: 0, hijacked: 0, collisions: 0, evasions: 0, gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
   });
 }
 export function scatter(m) {
@@ -92,6 +92,7 @@ export function linkModel(link) {
 }
 // Godzilla: a roaming exclusion zone. Drones inside the jam radius lose LTE and LoRa; inside the kill radius they are destroyed.
 export const ZILLA = { speed: 2.5, kill: 35, jam: 140, avoid: 90 };
+const jamHit = di => !!S.R.jammer && hypH(tp(S.R.d[di]), S.R.jammer.pos) <= S.R.jammer.r;
 const jammed = di => !!S.R.zilla && hypH(tp(S.R.d[di]), S.R.zilla.pos) <= ZILLA.jam;
 export function incident(text, kind = 'zilla') {
   S.mission.incidents.push({ t: S.R.t, kind, text });
@@ -148,6 +149,33 @@ function spoofTick(d) {
     incident(`D${d.i + 1} GNSS integrity alarm: fix disagrees with inertial/visual navigation by ${err.toFixed(0)} m; GNSS rejected, flying on visual-inertial and correcting`, 'workaround');
   }
 }
+// --- RF jamming and replay ---
+// A ground jammer blankets a circle with noise: links inside it die (hop: frequency hopping leaves them 70% lossy instead).
+export const JAM = { r: 150, dur: 120 };
+export function attackJam() {
+  if (S.R.jammer || !S.P.xy.length) return false;
+  const xy = S.P.xy, p = xy[Math.floor(S.R.rng() * xy.length)], cx = xy.reduce((a, q) => a + q[0], 0) / xy.length, cy = xy.reduce((a, q) => a + q[1], 0) / xy.length;
+  S.R.jammer = { pos: [(p[0] + cx) / 2, (p[1] + cy) / 2], r: JAM.r, t1: S.R.t + JAM.dur };
+  sec().jam++;
+  incident(`ATTACK: RF jammer switched on inside the survey area (${JAM.r} m radius, ${JAM.dur} s)`, 'attack');
+  return true;
+}
+// Replay: a genuine signed "return to launch" recorded earlier is played back. The signature is valid; only freshness gives it away.
+export function attackReplay(i) {
+  const d = S.R.d[i];
+  if (!d || d.lost || d.landed) return false;
+  const st = S.mission.stats;
+  st.sent++; st.bytes.lora += 20;
+  S.R.queue.push({ t: S.R.t, src: 'ATK', dst: i, type: 'CMD', link: 'lora', size: 20, payload: { cmd: 'RTL', signed: true, ts: S.R.t - 600 }, seq: 0, deliverAt: S.R.t + 0.5 });
+  sec().replay++;
+  incident(`ATTACK: a recorded, validly signed RTL command from ${fmtT(Math.max(0, S.R.t - 600))} is replayed to D${i + 1}`, 'attack');
+  return true;
+}
+function jamTick() {
+  const j = S.R.jammer;
+  if (j && S.R.t >= j.t1) { S.R.jammer = null; incident('The RF jammer has gone quiet', 'attack'); }
+}
+
 // --- Rogue drone ---
 // A hostile aircraft chases the nearest fleet drone. Within takeover range it tries to seize control over the unauthenticated radio
 // (stopped by signed commands); failing that it rams. Detect-and-avoid makes drones that sense it within ROGUE.sense evade.
@@ -221,8 +249,9 @@ export function send(src, dst, type, link, size, payload) {
   st.sent++; st.bytes[link] += size;
   let why = null;
   if (link === 'mesh') { if (hyp(tp(S.R.d[src]), tp(S.R.d[dst])) > MESH_RANGE) why = 'out of range'; }
-  else if (!m.faults[di][link] || jammed(di)) why = 'link down';
+  else if (!m.faults[di][link] || jammed(di) || (jamHit(di) && !(m.def && m.def.hop))) why = 'link down';
   const lm = linkModel(link);
+  if (jamHit(di) && m.def && m.def.hop) lm.loss = Math.max(lm.loss, 0.7);   // frequency hopping: degraded, not dead
   if (!why && S.R.rng() < lm.loss) why = 'loss';
   if (why) { st[why === 'loss' ? 'dropLoss' : 'dropDown']++; pushLog(msg, null, why); return; }
   msg.deliverAt = S.R.t + Math.max(1, lm.lat + (S.R.rng() * 2 - 1) * lm.jit) / 1000;
@@ -291,7 +320,10 @@ export function onDrone(d, msg) {
     send(d.i, 'G', 'ASSIGN_ACK', msg.link, 12, { id: a.id });
   } else if (msg.type === 'CMD') {
     const c = msg.payload, def = S.mission.def || {};
-    if (!c.signed && def.auth) {
+    if (def.fresh && c.ts !== undefined && S.R.t - c.ts > 30) {
+      sec().rejected++;
+      incident(`D${d.i + 1} rejected a replayed ${c.cmd} command (timestamp ${(S.R.t - c.ts).toFixed(0)} s old)`, 'workaround');
+    } else if (!c.signed && def.auth) {
       sec().rejected++;
       incident(`D${d.i + 1} rejected an unsigned ${c.cmd} command (authentication)`, 'workaround');
     } else if (c.cmd === 'RTL' && !d.rtl && !d.landed) {
@@ -451,7 +483,7 @@ export function gcsTick() {
       if (S.R.t - (g.auditAt ?? -1e9) > 3) {
         if (g.auditAt === undefined) incident(`GCS audit: D${i + 1} is returning home on a healthy link with no GCS order; sending a signed RESUME`, 'workaround');
         g.auditAt = S.R.t;
-        for (const l of ['lte', 'lora']) send('G', i, 'CMD', l, 24, { cmd: 'RESUME', signed: true });
+        for (const l of ['lte', 'lora']) send('G', i, 'CMD', l, 24, { cmd: 'RESUME', signed: true, ts: S.R.t });
       }
     }
     if (g.auditAt !== undefined && g.mode !== 'RTL') g.auditAt = undefined;
@@ -504,12 +536,13 @@ export function step() {
   });
   zillaTick();
   rogueTick();
+  jamTick();
   deliver();
   S.R.d.forEach(droneTick);
   gcsTick();
   separationCheck();
   const idle = S.R.d.every(d => { const md = modeOf(d); return md === 'DONE' || md === 'LANDED' || md === 'LOST'; }) && S.R.g.every(g => !g.assigns.length);
-  if (!idle || S.R.zilla || S.R.rogue) { S.R.idleSince = null; return true; }
+  if (!idle || S.R.zilla || S.R.rogue || S.R.jammer) { S.R.idleSince = null; return true; }
   if (S.R.idleSince === null) S.R.idleSince = S.R.t;
   const drained = S.R.d.every(d => !d.outbox.length && !d.newCells.length);
   return !(drained || S.R.t - S.R.idleSince > 60);

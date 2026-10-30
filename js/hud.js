@@ -1,7 +1,7 @@
 // Map-side run controls and link fault buttons.
 import { $, setHint } from './util.js';
 import { THREATS } from './threats.js';
-import { attackCmd, attackGps, unleashGodzilla, unleashRogue } from './sim.js';
+import { attackCmd, attackGps, attackJam, attackReplay, unleashGodzilla, unleashRogue } from './sim.js';
 import { S } from './state.js';
 import { logEvent } from './eventlog.js';
 import { renderUi } from './render.js';
@@ -29,8 +29,14 @@ $('btnRogue').onclick = () => {
   if (!S.running) { setHint('Press Start first: the rogue drone needs a live survey to attack.'); return; }
   if (!unleashRogue()) setHint('A rogue drone is already in the area.'); else renderUi(true);
 };
+$('btnJam').onclick = () => {
+  if (!S.mission || !S.R) return;
+  if (!S.running) { setHint('Press Start first: the jammer needs a live survey.'); return; }
+  if (!attackJam()) setHint('A jammer is already active.'); else renderUi(true);
+};
+$('btnReplay').onclick = attack(attackReplay);
 $('btnGps').onclick = attack(attackGps); $('btnCmd').onclick = attack(attackCmd);
-for (const [id, k] of [['defGnss', 'gnss'], ['defAuth', 'auth'], ['defAudit', 'audit'], ['defDaa', 'daa']]) {
+for (const [id, k] of [['defGnss', 'gnss'], ['defAuth', 'auth'], ['defAudit', 'audit'], ['defDaa', 'daa'], ['defHop', 'hop'], ['defFresh', 'fresh']]) {
   $(id).onchange = e => {
     if (!S.mission) return;
     S.mission.def = S.mission.def || {}; S.mission.def[k] = e.target.checked;

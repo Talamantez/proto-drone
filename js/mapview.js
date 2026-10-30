@@ -60,6 +60,7 @@ export function build(preserve) {
   $('elevWrap').hidden = !S.P.fac;
   applyWeights(); drawPois();
   layers.finds = L.layerGroup().addTo(S.map);
+  if (layers.jammer) { S.map.removeLayer(layers.jammer); layers.jammer = null; }
   if (layers.rogue) { S.map.removeLayer(layers.rogue); layers.rogue = null; }
   if (layers.zilla) { S.map.removeLayer(layers.zilla); layers.zilla = null; }
 

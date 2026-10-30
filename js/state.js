@@ -12,4 +12,4 @@ export const S = {
   lOpen: false,
 };
 
-export const layers = { draw: null, poly: null, cells: null, base: null, finds: null, pois: null, zilla: null, rogue: null, d: [] };
+export const layers = { draw: null, poly: null, cells: null, base: null, finds: null, pois: null, zilla: null, rogue: null, jammer: null, d: [] };

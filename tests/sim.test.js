@@ -186,3 +186,21 @@ test('rogue drone: hijacks over an open radio, rams when commands are signed, ev
   run(3600);
   assert.ok(S.R.rogue === null);
 });
+
+test('RF jamming forces failsafes; frequency hopping keeps contact', async () => {
+  const { attackJam } = await import('../js/sim.js');
+  const jamAll = () => { S.R.jammer.pos = S.P.base.slice(0, 2); S.R.jammer.r = 1e5; };
+  const a = makeMission(); run(30); attackJam(); jamAll(); run(70);
+  assert.ok(S.R.d.every(d => d.rtl || d.landed), 'undefended: every drone failsafes');
+  const b = makeMission(); b.def.hop = true; run(30); attackJam(); jamAll(); run(70);
+  assert.ok(S.R.d.some(d => !d.rtl && !d.landed), 'hopping: some stay in contact');
+  assert.ok(a.sec.jam === 1);
+});
+
+test('a replayed signed command beats signatures but not the freshness check', async () => {
+  const { attackReplay } = await import('../js/sim.js');
+  const a = makeMission(); a.def.auth = true; run(30); attackReplay(1); run(40);
+  assert.ok(S.R.d[1].rtl || S.R.d[1].landed, 'signed replay obeyed');
+  const b = makeMission(); b.def.auth = b.def.fresh = true; run(30); attackReplay(1); run(40);
+  assert.ok(!S.R.d[1].rtl && b.sec.rejected === 1, 'stale timestamp rejected');
+});
