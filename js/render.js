@@ -5,7 +5,7 @@ import { COLORS, TEL_BUDGET } from './constants.js';
 import { costs } from './controls.js';
 import { drawElev } from './mapview.js';
 import { layers } from './state.js';
-import { modeOf, nm } from './sim.js';
+import { ZILLA, modeOf, nm } from './sim.js';
 import { renderChallenge } from './challenges.js';
 import { renderEventLog } from './eventlog.js';
 import { wpct } from './poi-ui.js';
@@ -18,6 +18,17 @@ export function renderUi(force) {
     o.link.setLatLngs([S.P.f.toLL(S.P.base), ll]).setStyle({ color: linkColor(d.link), dashArray: d.link ? null : '4 4' });
     o.belief.setLatLng(g.pos);
   });
+  if (S.R.zilla && !layers.zilla) {
+    layers.zilla = L.layerGroup([
+      L.circle([0, 0], { pane: 'p_survey', radius: ZILLA.jam, color: '#d9a441', weight: 1, dashArray: '4 4', fillOpacity: 0.06, interactive: false }),
+      L.circle([0, 0], { pane: 'p_survey', radius: ZILLA.kill, color: '#d4605a', weight: 2, fillOpacity: 0.25, interactive: false }),
+      L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="zilla-icon">🦖</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false }),
+    ]).addTo(S.map);
+  }
+  if (layers.zilla) {
+    if (S.R.zilla) { const ll = S.P.f.toLL(S.R.zilla.pos); layers.zilla.eachLayer(l => l.setLatLng(ll)); }
+    else { S.map.removeLayer(layers.zilla); layers.zilla = null; }
+  }
   const now = performance.now();
   if (!force && now - S.R.lastUi < 250) return;
   S.R.lastUi = now;

@@ -24,7 +24,7 @@ export function snapshot() {
   m.dr = S.R.d.map(d => {
     const outbox = d.outbox.map(({ sentAt, ...rest }) => rest);
     if (d.newCells.length) outbox.push({ id: d.oid + 1, kind: 'cells', cells: d.newCells.slice() });
-    return { outbox, oid: d.oid + (d.newCells.length ? 1 : 0), rtl: d.rtl, landed: d.landed, wh: d.wh, flightT: d.flightT, rtlPos: d.rtl ? d.pos : null, extra: d.extra, applied: [...d.applied], detected: [...d.detected] };
+    return { outbox, oid: d.oid + (d.newCells.length ? 1 : 0), lost: d.lost, rtl: d.rtl, rtlWhy: d.rtlWhy, rejoin: d.rejoin, landed: d.landed, wh: d.wh, flightT: d.flightT, rtlPos: d.rtl || d.lost ? d.pos : null, extra: d.extra, applied: [...d.applied], detected: [...d.detected] };
   });
   m.gs = S.R.g.map(g => ({ reassigned: g.reassigned, total: g.total, assigns: g.assigns.map(({ sentAt, ...a }) => a) }));
 }

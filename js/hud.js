@@ -1,5 +1,6 @@
 // Map-side run controls and link fault buttons.
-import { $ } from './util.js';
+import { $, setHint } from './util.js';
+import { unleashGodzilla } from './sim.js';
 import { S } from './state.js';
 import { logEvent } from './eventlog.js';
 import { renderUi } from './render.js';
@@ -14,6 +15,12 @@ export function faultClick(e) {
   logEvent(`Fault injection: D${i + 1} ${l.toUpperCase()} ${f[l] ? 'restored' : 'cut'}`, 'fault');
   renderUi(true); tourSignal('fault');
 }
+$('btnZilla').onclick = () => {
+  if (!S.mission || !S.R) return;
+  if (!S.running) { setHint('Press Start first: Godzilla only attacks a live survey.'); return; }
+  if (!unleashGodzilla()) setHint(S.P.fac ? 'Godzilla only stomps area surveys, not wall inspections.' : 'Godzilla is already on the loose.');
+  else renderUi(true);
+};
 $('drones').onclick = faultClick; $('hudFaultRows').onclick = faultClick;
 L.DomEvent.disableClickPropagation($('hud')); L.DomEvent.disableClickPropagation($('hudFaults'));
 export const mirror = (src, dst) => {

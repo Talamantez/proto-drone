@@ -20,7 +20,7 @@ export function resetRun(m) {
   Object.assign(m, {
     dist: [], covered: [], gcsCovered: [], found: [], dr: [], gs: [], simT: 0, alerts: 0, status: 'planned',
     stats: freshStats(), assignN: 0, faults: Array.from({ length: m.params.n }, () => ({ lte: true, lora: true })),
-    checks: [], fired: [],
+    checks: [], fired: [], incidents: [], written: [],
   });
 }
 export function scatter(m) {
@@ -66,13 +66,13 @@ export function initRuntime(m) {
     if (m.dist[i] === undefined) m.dist[i] = 0;
     const d = {
       i, path, cum, total: cum[cum.length - 1], extra: (sv.extra || []).slice(), applied: new Set(sv.applied || []),
-      rtl: !!sv.rtl, landed: !!sv.landed, wh: sv.wh || 0, flightT: sv.flightT || 0, detected: new Set(sv.detected || []),
+      lost: !!sv.lost, rtl: !!sv.rtl, rtlWhy: sv.rtlWhy || null, rejoin: !!sv.rejoin, landed: !!sv.landed, wh: sv.wh || 0, flightT: sv.flightT || 0, detected: new Set(sv.detected || []),
       outbox: (sv.outbox || []).map(it => ({ ...it, sentAt: -1e9 })), newCells: [], oid: sv.oid || 0,
       lastGcs: { lte: S.R.t, lora: S.R.t }, link: 'lte', peers: {}, advAt: {},
       nextHb: S.R.t, nextTel: S.R.t, nextMesh: S.R.t, nextRep: S.R.t,
       alt: (m.params.heritage ? cap(m.params).stand : ALT_BASE) + (m.params.layer ? i * ALT_STEP : 0),
     };
-    d.pos = d.rtl ? (sv.rtlPos || S.P.base) : posAtPath(d.path, d.cum, m.dist[i]);
+    d.pos = d.rtl || d.lost ? (sv.rtlPos || S.P.base) : posAtPath(d.path, d.cum, m.dist[i]);
     S.R.d.push(d);
     S.R.g.push({
       lastRx: S.R.t, sampleT: S.R.t, state: 'OK', mode: modeOf(d), pos: S.P.f.toLL(d.pos), prog: m.dist[i], alt: d.alt,
@@ -83,12 +83,50 @@ export function initRuntime(m) {
 }
 
 export function cumAt(path, k) { let s = 0; for (let q = 1; q <= k; q++) s += hyp(path[q], path[q - 1]); return s; }
-export const modeOf = d => d.landed ? 'LANDED' : d.rtl ? 'RTL' : (S.mission.dist[d.i] >= d.total - 0.01 ? 'DONE' : 'AUTO');
+export const modeOf = d => d.lost ? 'LOST' : d.landed ? 'LANDED' : d.rtl ? 'RTL' : d.hold ? 'HOLD' : (S.mission.dist[d.i] >= d.total - 0.01 ? 'DONE' : 'AUTO');
 export function linkModel(link) {
   const p = S.mission.params;
   if (link === 'lte') return { lat: p.lteLat, jit: p.lteLat * 0.5, loss: p.lteLoss / 100 };
   if (link === 'lora') return { lat: 450, jit: 150, loss: p.loraLoss / 100 };
   return { lat: 15, jit: 8, loss: 0.01 };
+}
+// Godzilla: a roaming exclusion zone. Drones inside the jam radius lose LTE and LoRa; inside the kill radius they are destroyed.
+export const ZILLA = { speed: 2.5, kill: 35, jam: 140, avoid: 90 };
+const jammed = di => !!S.R.zilla && hypH(S.R.d[di].pos, S.R.zilla.pos) <= ZILLA.jam;
+export function incident(text, kind = 'zilla') {
+  S.mission.incidents.push({ t: S.R.t, kind, text });
+  hooks.log(text, 'fault');
+}
+export function unleashGodzilla() {
+  const m = S.mission;
+  if (S.P.fac || S.R.zilla || !S.P.xy.length) return false;
+  const xy = S.P.xy, cx = xy.reduce((a, p) => a + p[0], 0) / xy.length, cy = xy.reduce((a, p) => a + p[1], 0) / xy.length;
+  const reach = Math.max(...xy.map(p => Math.hypot(p[0] - cx, p[1] - cy))) + ZILLA.jam;
+  const a = S.R.rng() * 2 * Math.PI;
+  S.R.zilla = { pos: [cx - Math.cos(a) * reach, cy - Math.sin(a) * reach], vel: [Math.cos(a) * ZILLA.speed, Math.sin(a) * ZILLA.speed], c: [cx, cy], reach, passed: false };
+  m.zilla = (m.zilla || 0) + 1;
+  incident('GODZILLA attacks from the edge of the survey area, heading for the middle', 'zilla');
+  return true;
+}
+function zillaTick() {
+  const z = S.R.zilla, m = S.mission;
+  if (!z) return;
+  z.pos = [z.pos[0] + z.vel[0] * DT, z.pos[1] + z.vel[1] * DT];
+  if (Math.hypot(z.pos[0] - z.c[0], z.pos[1] - z.c[1]) < 5) z.passed = true;
+  // ground it tramples is written off: no point re-flying it
+  S.P.cells.forEach((c, ci) => {
+    if (!S.R.cov.has(ci) && !m.written.includes(ci) && hypH(c.c, z.pos) <= ZILLA.kill) m.written.push(ci);
+  });
+  for (const d of S.R.d) {
+    if (d.lost || d.landed || hypH(d.pos, z.pos) > ZILLA.kill) continue;
+    d.lost = true; d.landed = true; d.hold = false;
+    incident(`D${d.i + 1} destroyed by Godzilla at ${fmtT(S.R.t)}`, 'loss');
+  }
+  const off = [z.pos[0] - z.c[0], z.pos[1] - z.c[1]];
+  if ((z.passed || off[0] * z.vel[0] + off[1] * z.vel[1] > 0) && Math.hypot(...off) > z.reach) {
+    S.R.zilla = null;
+    incident(`Godzilla has left the area; ${m.written.length} cells trampled and written off`, 'zilla');
+  }
 }
 export const nm = x => x === 'G' ? 'GCS' : 'D' + (x + 1);
 export function send(src, dst, type, link, size, payload) {
@@ -98,7 +136,7 @@ export function send(src, dst, type, link, size, payload) {
   st.sent++; st.bytes[link] += size;
   let why = null;
   if (link === 'mesh') { if (hyp(S.R.d[src].pos, S.R.d[dst].pos) > MESH_RANGE) why = 'out of range'; }
-  else if (!m.faults[di][link]) why = 'link down';
+  else if (!m.faults[di][link] || jammed(di)) why = 'link down';
   const lm = linkModel(link);
   if (!why && S.R.rng() < lm.loss) why = 'loss';
   if (why) { st[why === 'loss' ? 'dropLoss' : 'dropDown']++; pushLog(msg, null, why); return; }
@@ -176,23 +214,38 @@ export function onDrone(d, msg) {
     }
   }
 }
+function holdForZilla(d) {
+  const z = S.R.zilla, m = S.mission;
+  const clear = ZILLA.avoid + ZILLA.kill + (d.hold ? 25 : 0);   // hysteresis so a hold does not flicker
+  const near = !!z && hypH(posAtPath(d.path, d.cum, Math.min(d.total, m.dist[d.i] + m.params.speed * 6)), z.pos) < clear;
+  if (near !== !!d.hold) incident(near ? `D${d.i + 1} holds clear of Godzilla` : `D${d.i + 1} resumes survey`, 'workaround');
+  d.hold = near;
+  return near;
+}
 export function droneTick(d) {
   const m = S.mission, i = d.i;
+  if (d.lost) return;
   const age = l => S.R.t - d.lastGcs[l];
   d.link = age('lte') < LINK_FRESH ? 'lte' : age('lora') < LINK_FRESH ? 'lora' : null;
   const mode = modeOf(d);
 
   // failsafe: no GCS heartbeat on either link
   if (!d.rtl && !d.landed && mode !== 'DONE' && Math.min(age('lte'), age('lora')) > FS_RTL) {
-    d.rtl = true;
+    d.rtl = true; d.rtlWhy = 'link';
     hooks.log(`D${i + 1} failsafe: GCS heartbeat lost ${FS_RTL} s on all links, returning to base`, 'failsafe');
+  }
+
+  // link restored after a link failsafe: relaunch if landed and rejoin the survey where it left off
+  if (d.rtl && d.rtlWhy === 'link' && d.link) {
+    d.rtl = false; d.rtlWhy = null; d.landed = false; d.rejoin = true;
+    hooks.log(`D${i + 1} link restored (${d.link.toUpperCase()}), rejoining survey`, 'failsafe');
   }
 
   // energy: draw while airborne (not landed, not parked at end of path); low battery forces RTL
   if (!d.landed && mode !== 'DONE') {
     d.wh += quadPower(m.params.speed, hooks.hoverW()) * DT / 3600; d.flightT += DT;
     if (!d.rtl && d.wh >= hooks.battUsable()) {
-      d.rtl = true;
+      d.rtl = true; d.rtlWhy = 'batt';
       hooks.log(`D${i + 1} low battery: ${d.wh.toFixed(0)} Wh used, returning to base`, 'failsafe');
     }
   }
@@ -202,6 +255,12 @@ export function droneTick(d) {
     const step = m.params.speed * DT, dist = hyp(d.pos, S.P.base);
     if (dist <= step) { d.pos = S.P.base; d.landed = true; hooks.log(`D${i + 1} landed at base`, 'failsafe'); }
     else d.pos = d.pos.map((v, k) => v + (S.P.base[k] - v) * step / dist);
+  } else if (d.rejoin) {
+    const step = m.params.speed * DT, to = posAtPath(d.path, d.cum, m.dist[i]), dist = hyp(d.pos, to);
+    if (dist <= step) { d.pos = to; d.rejoin = false; hooks.log(`D${i + 1} back on survey path`, 'failsafe'); }
+    else d.pos = d.pos.map((v, k) => v + (to[k] - v) * step / dist);
+  } else if (!d.rtl && m.dist[i] < d.total && holdForZilla(d)) {
+    // coordinated workaround: wait out the monster instead of flying into it
   } else if (!d.rtl && m.dist[i] < d.total) {
     m.dist[i] = Math.min(d.total, m.dist[i] + m.params.speed * DT);
     d.pos = posAtPath(d.path, d.cum, m.dist[i]);
@@ -291,7 +350,10 @@ export function tryReassign(i) {
   const g = S.R.g[i], d = S.R.d[i];
   if (g.total - g.prog < 5) { g.reassigned = true; return; }
   const cands = S.R.g.map((x, k) => k).filter(k => k !== i && S.R.g[k].state === 'OK' && (S.R.g[k].mode === 'AUTO' || S.R.g[k].mode === 'DONE'));
-  if (!cands.length) { g.nextTry = S.R.t + 5; return; }
+  if (!cands.length) {
+    if (d.lost && S.R.d.every(o => o.lost || (o.landed && o.rtlWhy !== 'link'))) { g.reassigned = true; incident(`No drone left to take D${i + 1}'s remaining work: cutting losses`, 'loss'); return; }
+    g.nextTry = S.R.t + 5; return;
+  }
   const k = cands.reduce((a, b) => (S.R.g[a].total - S.R.g[a].prog <= S.R.g[b].total - S.R.g[b].prog ? a : b));
   const start = posAtPath(d.path, d.cum, g.prog);
   let idx = d.cum.findIndex(c => c > g.prog);
@@ -324,12 +386,13 @@ export function step() {
     for (const l of e.links) if (m.faults[e.d]) m.faults[e.d][l] = e.up;
     hooks.log(`Scripted incident: ${e.text}`, 'fault');
   });
+  zillaTick();
   deliver();
   S.R.d.forEach(droneTick);
   gcsTick();
   separationCheck();
-  const idle = S.R.d.every(d => { const md = modeOf(d); return md === 'DONE' || md === 'LANDED'; }) && S.R.g.every(g => !g.assigns.length);
-  if (!idle) { S.R.idleSince = null; return true; }
+  const idle = S.R.d.every(d => { const md = modeOf(d); return md === 'DONE' || md === 'LANDED' || md === 'LOST'; }) && S.R.g.every(g => !g.assigns.length);
+  if (!idle || S.R.zilla) { S.R.idleSince = null; return true; }
   if (S.R.idleSince === null) S.R.idleSince = S.R.t;
   const drained = S.R.d.every(d => !d.outbox.length && !d.newCells.length);
   return !(drained || S.R.t - S.R.idleSince > 60);

@@ -8,6 +8,7 @@ import { logEvent } from './eventlog.js';
 import { renderUi } from './render.js';
 import { saveMission } from './missions.js';
 import { step } from './sim.js';
+import { openReport } from './report-ui.js';
 
 export function frameLoop(ts) {
   if (!S.running) return;
@@ -29,4 +30,5 @@ export function finish() {
     logEvent(`Challenge “${s.title}”: ${won}/${N} goals, ${won === N ? 'GOLD' : won === N - 1 ? 'SILVER' : won * 2 >= N ? 'BRONZE' : 'try again'}`, 'done');
   }
   renderUi(true); saveMission();
+  openReport();
 }
