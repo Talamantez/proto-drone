@@ -60,7 +60,7 @@ def test_desktop_first_run(b, url):
     assert not pg.is_visible('#tour')
     # Layers panel
     pg.click('#lyr [data-a=toggle]') if not pg.is_visible('#lyr .lbody') else None
-    assert pg.locator('#lyr .lrow').count() == 12
+    assert pg.locator('#lyr .lrow[data-id]').count() == 12
     pg.click('#lyr .lrow[data-id=streets] [data-a=eye]'); pg.click('#lyr .lrow[data-id=streets] [data-a=exp]')
     pg.select_option('#lyr .lrow[data-id=streets] select', 'multiply')
     pg.evaluate("(()=>{const i=document.querySelector('#lyr .lrow[data-id=streets] input');i.value=50;i.dispatchEvent(new Event('input',{bubbles:true}))})()")
@@ -133,7 +133,27 @@ def test_mobile(b, url):
     ctx.close()
 
 
-TESTS = [test_desktop_first_run, test_navigation, test_mobile]
+def test_survey_never_hidden_under_imagery(b, url):
+    ctx = b.new_context(viewport={'width': 1300, 'height': 760})
+    pg, errs = page_with_errors(ctx)
+    pg.goto(url); pg.wait_for_timeout(1000); pg.keyboard.press('Escape')
+    pg.click('#lyr [data-a=toggle]')
+    for _ in range(11): pg.click('#lyr .lrow[data-id=sat] [data-a=up]')
+    pg.click('#lyr .lrow[data-id=survey] [data-a=eye]')
+    order = pg.evaluate('__app.LP.order'); assert order[0] == 'sat' and pg.evaluate("__app.S.map.getPane('p_survey').style.display") == 'none'
+    pg.click('#lyr [data-a=toggle]'); pg.click('#dbDraw')
+    for x, y in [(600, 320), (850, 320), (850, 520)]: pg.mouse.click(x, y)
+    pg.click('#dbClose'); pg.wait_for_timeout(1200)
+    z = pg.evaluate("(()=>{const z=n=>+__app.S.map.getPane(n).style.zIndex;return [z('p_survey'),z('p_fleet'),z('p_sat'),__app.S.map.getPane('p_survey').style.display]})()")
+    assert z[0] > z[2] and z[1] > z[2] and z[3] == '', z
+    assert 'brought to the front' in pg.inner_text('#hint')
+    pg.click('#lyr [data-a=toggle]'); pg.click('#lyr [data-a=reset]')
+    assert pg.evaluate('__app.LP.order') == ['fleet', 'survey', 'poi', 'env', 'ovFlood', 'ovWater', 'ovNight', 'ovLst', 'ovNdvi', 'hist', 'streets', 'sat']
+    assert not errs, errs
+    ctx.close()
+
+
+TESTS = [test_desktop_first_run, test_navigation, test_mobile, test_survey_never_hidden_under_imagery]
 
 if __name__ == '__main__':
     failed = 0

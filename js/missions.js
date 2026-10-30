@@ -2,6 +2,7 @@
 import './map.js';
 import { $, fmtT, isNarrow, setHint } from './util.js';
 import { setSheet } from './sheet.js';
+import { lReveal } from './layerpanel.js';
 import { DB } from './db.js';
 import { S } from './state.js';
 import { build, clearMission } from './mapview.js';
@@ -99,10 +100,11 @@ export function adoptPoly(poly, mode, label) {
   S.mission = newMission(poly);
   S.mission.params.mode = mode;
   build(false);
+  const unhid = lReveal(['fleet', 'survey']);   // a layer toggled off or stacked under the imagery would hide the new area
   if (label) S.map.fitBounds(layers.poly.getBounds().pad(0.3));
   saveMission().then(() => refreshMissionList(S.mission.id));
   logEvent(`${mode === 'facade' ? 'Wall' : 'Area'} defined: ${S.P.cells.length} cells, ${S.mission.params.n} drones, seed ${S.mission.params.seed}`, 'plan');
-  setControls(); setHint('Plan ready. Press Start on the map; use “Break a link” (top left of the map) to test failover.');
+  setControls(); setHint('Plan ready. Press Start on the map; use “Break a link” (top left of the map) to test failover.' + (unhid ? ' The survey layers were hidden or under another layer, so they were brought to the front.' : ''));
   tourSignal('draw');
 }
 S.map.on('click', e => {
