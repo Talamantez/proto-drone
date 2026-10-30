@@ -188,6 +188,12 @@ button.cta:hover:not(:disabled) { background: #5bf09b; border-color: #b4ffd3; }
 #defList label.chk { display: flex; margin: 4px 0; } #defList input { flex: none; }
 @media (max-width: 800px) { #threatBox { top: 98px; } }
 
+/* "Press me next": the button the walkthrough wants (Close polygon when the outline is ready, Start once a plan exists). */
+button.next:not(:disabled) { background: #3ddc84; border-color: #b4ffd3; color: #04210f; font-weight: 700; animation: cta-pulse 1.6s ease-out infinite; }
+#dbClose.next::before { content: '👉 '; }
+#drawBar button.next { padding: 10px 20px; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { button.next { animation: none !important; } }
+
 /* Drawing guide: says what to do next, with a switch between tapping corners and sketching with a pen. */
 #drawGuide { width: min(360px, 100%); background: rgba(24,29,34,.96); border: 1px solid #d9a441; border-radius: 8px; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.5); text-align: center; }
 #drawGuide[hidden] { display: none; }

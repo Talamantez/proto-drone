@@ -75,10 +75,10 @@ function paintDraw() {
   });
 }
 const GUIDE = {
-  points: n => n === 0 ? ['Tap the map to drop your first corner', 'This one becomes the launch base (green).'] : n < 3 ? [`${n} placed · ${3 - n} more needed`, 'Keep tapping around the edge of the area. Undo removes the last corner.'] : [`${n} corners · ready`, 'Add more corners, or press Close polygon to finish.'],
-  facade: n => n === 0 ? ['Tap the wall foot, left end first', 'Stand on the drone side: the wall is on your left. This point is the launch side.'] : n < 2 ? ['1 placed · 1 more needed', 'Tap the other end of the wall foot.'] : ['2 points · ready', 'Press Finish line.'],
-  shape: n => n ? [`${SHAPES[$('dgShapeSel').value].label} · ${$('dgSize').value} m across`, 'Drag the size slider to scale it, tap elsewhere to move it, or press Close polygon.'] : ['Pick a shape, then tap where to put it', 'Tap the map to drop it centred there; the first corner becomes the base.'],
-  pen: n => penDone ? [`Outline captured · ${n} corners`, 'Press Close polygon, or draw again to redo it.'] : ['Press and drag to sketch the outline', 'Go all the way around, then lift. It snaps to corners; the start becomes the base.'],
+  points: n => n === 0 ? ['Tap the map to drop your first corner', 'This one becomes the launch base (green).'] : n < 3 ? [`${n} placed · ${3 - n} more needed`, 'Keep tapping around the edge of the area. Undo removes the last corner.'] : [`${n} corners · ready`, 'Press the green Close polygon button, or keep tapping to add corners.'],
+  facade: n => n === 0 ? ['Tap the wall foot, left end first', 'Stand on the drone side: the wall is on your left. This point is the launch side.'] : n < 2 ? ['1 placed · 1 more needed', 'Tap the other end of the wall foot.'] : ['2 points · ready', 'Press the green Finish line button.'],
+  shape: n => n ? [`${SHAPES[$('dgShapeSel').value].label} · ${$('dgSize').value} m across`, 'Drag the slider to scale it, tap elsewhere to move it, then press the green Close polygon button.'] : ['Pick a shape, then tap where to put it', 'Tap the map to drop it centred there; the first corner becomes the base.'],
+  pen: n => penDone ? [`Outline captured · ${n} corners`, 'Press the green Close polygon button, or draw again to redo it.'] : ['Press and drag to sketch the outline', 'Go all the way around, then lift. It snaps to corners; the start becomes the base.'],
 };
 export function syncDrawBar() {
   const n = S.drawPts.length, g = GUIDE[drawMode === 'facade' ? 'facade' : drawTool](n), canPen = drawMode === 'area';
@@ -91,6 +91,7 @@ export function syncDrawBar() {
   $('dgSteps').children[0].className = n >= drawNeed() ? 'done' : 'now';
   $('dgSteps').children[1].className = n >= drawNeed() ? 'now' : '';
   $('map').classList.toggle('pen-mode', penOn());
+  $('hudRun').classList.toggle('next', !S.drawing && !$('btnRun').disabled && $('btnRun').textContent === 'Start');   // one highlighted button at a time
 }
 function setTool(t) {
   drawTool = t; if (!S.drawing) return;

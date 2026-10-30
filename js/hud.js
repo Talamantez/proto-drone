@@ -16,16 +16,17 @@ export function faultClick(e) {
 }
 $('drones').onclick = faultClick; $('hudFaultRows').onclick = faultClick;
 L.DomEvent.disableClickPropagation($('hud')); L.DomEvent.disableClickPropagation($('hudFaults'));
-export const mirror = (src, dst) => {
-  const f = () => { dst.textContent = src.textContent; dst.disabled = src.disabled; };
+// `next(src)` marks dst as the button the user should press now; it gets a pulsing highlight.
+export const mirror = (src, dst, next) => {
+  const f = () => { dst.textContent = src.textContent; dst.disabled = src.disabled; if (next) dst.classList.toggle('next', next(src)); };
   new MutationObserver(f).observe(src, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['disabled'] }); f();
 };
-mirror($('btnRun'), $('hudRun')); mirror($('btnReset'), $('hudReset'));
+mirror($('btnRun'), $('hudRun'), b => !b.disabled && b.textContent === 'Start' && !S.drawing); mirror($('btnReset'), $('hudReset'));
 $('hudRun').onclick = () => $('btnRun').click(); $('hudReset').onclick = () => $('btnReset').click();
 
 // On-map drawing controls mirror the sidebar ones, so a phone never needs the settings sheet to draw.
 L.DomEvent.disableClickPropagation($('drawBar'));
-mirror($('btnFinish'), $('dbClose'));
+mirror($('btnFinish'), $('dbClose'), b => !b.disabled);
 $('dbDraw').onclick = () => $('btnDraw').click();
 $('dbClose').onclick = () => $('btnFinish').click();
 $('dbDemo').onclick = () => $('btnDemo').click();
