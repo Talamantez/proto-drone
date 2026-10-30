@@ -23,6 +23,20 @@ npm run e2e          # browser flows (needs: pip install playwright && playwrigh
 
 The simulation core runs headless, so the tests fly real missions: determinism for a seed, coverage, failover after losing both links, LoRa-only detections, battery return, message accounting.
 
+## Workflow
+
+`main` is what GitHub Pages serves, so it stays releasable. Work happens on `dev` (or a branch off it) and reaches `main` through a pull request:
+
+```
+git checkout dev && git pull
+# ...change, then before pushing:
+npm run lint && npm test && npm run e2e
+git push origin dev
+gh pr create --base main --head dev
+```
+
+CI (lint, unit tests, browser tests) runs on every push and pull request. Merge once it is green; Pages redeploys from `main` within a minute.
+
 ## Layout
 
 | Path | What it holds |

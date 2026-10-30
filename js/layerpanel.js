@@ -48,6 +48,25 @@ export function lSetVisible(id, v) {
   else { const l = id === 'sat' ? sat : osm; v ? l.addTo(S.map) : S.map.removeLayer(l); }
   lApply(id); lSave(); lRender();
 }
+// Shows the given vector layers and brings them to the front when a raster layer sits above them, so a new area is never hidden.
+// Returns true if anything had to change.
+export function lReveal(ids) {
+  let changed = false;
+  for (const id of ids) if (!lSt(id).v) { lSt(id).v = true; changed = true; }
+  const firstRaster = LP.order.findIndex(i => LDEF[i].kind !== 'pane'), lastOurs = Math.max(...ids.map(id => LP.order.indexOf(id)));
+  if (firstRaster !== -1 && firstRaster < lastOurs) { LP.order = [...ids, ...LP.order.filter(i => !ids.includes(i))]; changed = true; }
+  if (changed) { LORDER.forEach(lApply); lSave(); lRender(); }
+  return changed;
+}
+
+// Back to the defaults: original order, satellite only, no overlays, nothing hidden.
+export function lReset() {
+  LP.order = LORDER.slice(); LP.st = {};
+  for (const id of LORDER) if (LDEF[id].kind === 'tile') { $(id).checked = false; ovSync(id); }
+  if (!$('hwOn').disabled && $('hwOn').checked) { $('hwOn').checked = false; hwBuild(); }
+  S.map.removeLayer(osm); if (!S.map.hasLayer(sat)) sat.addTo(S.map);
+  LORDER.forEach(lApply); lSave(); lRender();
+}
 export const lyr = document.createElement('div'); lyr.id = 'lyr'; S.map.getContainer().appendChild(lyr);
 L.DomEvent.disableClickPropagation(lyr); L.DomEvent.disableScrollPropagation(lyr);
 let lExp = null;
@@ -62,12 +81,13 @@ export function lRender() {
         `<button class="mini" data-a="up" ${i === 0 ? 'disabled' : ''} title="Raise">▲</button><button class="mini" data-a="down" ${i === LP.order.length - 1 ? 'disabled' : ''} title="Lower">▼</button></div>` +
         (lExp === id ? `<div class="lctl"><input type="range" data-a="op" min="0" max="100" value="${Math.round(s.o * 100)}" title="Opacity"><select data-a="bl" title="Blend mode">${BLENDS.map(b => `<option${b === s.b ? ' selected' : ''}>${b}</option>`).join('')}</select></div>` : '') +
         '</div>';
-    }).join('')}</div>`);
+    }).join('')}<div class="lrow"><button class="mini" data-a="reset" title="Restore the default order, visibility and settings">↺ Reset layers</button></div></div>`);
 }
 lyr.addEventListener('click', e => {
   const b = e.target.closest('[data-a]'); if (!b) return;
   const a = b.dataset.a, id = (b.closest('.lrow') || {}).dataset?.id;
   if (a === 'toggle') { S.lOpen = !S.lOpen; lRender(); }
+  else if (a === 'reset') lReset();
   else if (a === 'eye') lSetVisible(id, !lVisible(id));
   else if (a === 'exp') { lExp = lExp === id ? null : id; lRender(); }
   else if (a === 'up' || a === 'down') {

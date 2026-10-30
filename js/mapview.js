@@ -43,8 +43,10 @@ export function build(preserve) {
   clearMission();
   const m = S.mission;
   planMission(m, preserve);
-  const outline = { pane: 'p_survey', color: '#fff', weight: 1.5, fill: false, dashArray: '6 4' };
-  layers.poly = (S.P.fac ? L.polyline(m.poly, outline) : L.polygon(m.poly, outline)).addTo(S.map);
+  // A dark casing under the white dashes keeps the outline readable on pale ground.
+  const outline = { pane: 'p_survey', color: '#fff', weight: 2, fill: false, dashArray: '7 5' }, casing = { pane: 'p_survey', color: '#000', weight: 5, opacity: .45, fill: false, interactive: false };
+  const shape = o => S.P.fac ? L.polyline(m.poly, o) : L.polygon(m.poly, o);
+  layers.poly = L.featureGroup([shape(casing), shape(outline)]).addTo(S.map);
   layers.base = L.marker(S.P.f.toLL(S.P.base), { title: 'Base / GCS', pane: 'p_fleet' }).addTo(S.map);
   if (S.P.fac) {
     const F = S.P.fac, edge = u => S.P.f.toLL([F.A[0] + F.t[0] * u + F.nr[0] * F.c.stand, F.A[1] + F.t[1] * u + F.nr[1] * F.c.stand]);
