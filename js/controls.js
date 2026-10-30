@@ -69,6 +69,7 @@ export function setControls() {
   ['btnPlan', 'btnReset', 'btnDelete', 'btnCsv', 'btnManifest'].forEach(id => $(id).disabled = !has);
   const area = has && (S.mission.params.mode || 'area') === 'area';
   $('dbDemo').hidden = has;
+  $('drawBar').classList.toggle('has-mission', has);
   $('hudFaults').hidden = !has; $('libSave').disabled = !has;
   $('btnEnv').disabled = !has; $('btnPois').disabled = !area; $('btnSnap').disabled = !area || !S.mission.pois.length; $('btnUnsnap').disabled = !area || !S.mission.baseLL;
   $('btnRun').disabled = !has || S.mission.status === 'complete';
