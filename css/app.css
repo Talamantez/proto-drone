@@ -55,7 +55,7 @@ button.demo { background: #2f4a37; border-color: #4f7a5a; }
 #hud .primary { min-width: 72px; font-weight: 600; }
 #hudStat { color: var(--dim); margin-left: 6px; font-variant-numeric: tabular-nums; }
 #hudStat b { color: var(--fg); }
-#hudFaults { position: absolute; top: 134px; left: 10px; z-index: 1000; background: rgba(24,29,34,.92); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+#hudFaults { position: absolute; top: 96px; left: 58px; max-height: calc(100% - 230px); overflow-y: auto; z-index: 1000; background: rgba(24,29,34,.92); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
 #hudFaults[hidden], #hud[hidden] { display: none; }
 #hudFaults .t { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
 #hudFaults .fr { display: flex; gap: 4px; align-items: center; margin: 2px 0; }
@@ -111,7 +111,6 @@ button.demo { background: #2f4a37; border-color: #4f7a5a; }
   #mapHint { display: block; max-width: 520px; max-height: 4.3em; overflow: hidden; padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; background: rgba(18,22,26,.93); font-size: 11px; line-height: 1.35; }
   #mapHint[hidden] { display: none; }
   #hudStat { display: none; }
-  #hudFaults { top: 98px; }
   #search { left: 52px; width: calc(100% - 172px); min-width: 0; }
   #lyr:not([style*='auto']) { width: 172px; }
   #lyr .lbody { max-height: 28vh; }
@@ -175,6 +174,10 @@ button.cta:hover:not(:disabled) { background: #5bf09b; border-color: #b4ffd3; }
 #threatList summary { cursor: pointer; } #threatList .tag { float: right; font-size: 10px; color: var(--dim); }
 #threatList .tag.live { color: var(--ok); } #threatList p { margin: 3px 0 5px; color: var(--dim); }
 #threatBox { position: absolute; top: 134px; right: 10px; z-index: 1000; width: 170px; }
+#threatQuick { display: grid; gap: 4px; margin-bottom: 4px; }
+#threatQuick button { padding: 8px 10px; font-weight: 700; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+#threatQuick .zilla { background: #5a1f1c; border-color: #d4605a; color: #ffd7d3; }
+#threatQuick .rogue { background: #2a2147; border-color: #9b87e0; color: #e1d9ff; }
 #threatBox .atk { width: 100%; margin: 0; }
 #threatMenu { margin-top: 4px; background: rgba(24,29,34,.96); border: 1px solid var(--line); border-radius: 6px; padding: 6px; max-height: 60vh; overflow-y: auto; }
 #threatMenu .t { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin: 4px 0 3px; }
@@ -184,3 +187,23 @@ button.cta:hover:not(:disabled) { background: #5bf09b; border-color: #b4ffd3; }
 #threatItems { display: grid; gap: 3px; } #threatItems button { text-align: left; padding: 4px 8px; }
 #defList label.chk { display: flex; margin: 4px 0; } #defList input { flex: none; }
 @media (max-width: 800px) { #threatBox { top: 98px; } }
+
+/* Drawing guide: says what to do next, with a switch between tapping corners and sketching with a pen. */
+#drawGuide { width: min(360px, 100%); background: rgba(24,29,34,.96); border: 1px solid #d9a441; border-radius: 8px; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.5); text-align: center; }
+#drawGuide[hidden] { display: none; }
+#dgSteps { display: flex; justify-content: center; gap: 6px; margin-bottom: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+#dgSteps span { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--dim); }
+#dgSteps .now { border-color: #d9a441; color: #ffe6b3; background: #3b2a12; }
+#dgSteps .done { border-color: var(--ok); color: var(--ok); }
+#dgTitle { font-weight: 700; font-size: 14px; }
+#dgBody { margin: 2px 0 6px; font-size: 12px; line-height: 1.35; }
+#dgTools { display: flex; }
+#dgTools[hidden] { display: none; }
+#dgTools button { flex: 1; border-radius: 0; padding: 7px 4px; }
+#dgTools button:first-child { border-radius: 6px 0 0 6px; } #dgTools button:last-child { border-radius: 0 6px 6px 0; }
+#dgTools button.on { background: #d9a441; border-color: #ffe6b3; color: #1b1405; font-weight: 700; }
+#dgShape { display: flex; gap: 6px; align-items: center; margin-top: 6px; } #dgShape[hidden] { display: none; }
+#dgShape select { flex: 1; min-width: 0; } #dgShape input { flex: 1.2; min-width: 0; } #dgShape span { width: 52px; text-align: right; font-size: 11px; }
+#map.pen-mode, #map.pen-mode * { cursor: crosshair; touch-action: none; }
+.drawtip { background: rgba(18,22,26,.9); color: #fff; border: 1px solid var(--line); font-weight: 700; padding: 0 4px; }
+.drawtip::before { display: none; }

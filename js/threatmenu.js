@@ -13,13 +13,17 @@ const ATTACKS = [
   { icon: '🎭', name: 'Forged RTL', kind: 'drone', fn: sim.attackCmd },
   { icon: '⏪', name: 'Replay', kind: 'drone', fn: sim.attackReplay },
   { icon: '📻', name: 'RF jammer', kind: 'area', fn: sim.attackJam },
-  { icon: '🛸', name: 'Rogue drone', kind: 'area', fn: sim.unleashRogue },
   { icon: '👂', name: 'Eavesdropper', kind: 'area', fn: sim.attackSnoop },
   { icon: '🔥', name: 'Radio flood', kind: 'drone', fn: sim.attackFlood },
   { icon: '☠', name: 'Bad map data', kind: 'drone', fn: sim.attackPoison },
   { icon: '🎯', name: 'Decoys', kind: 'area', fn: sim.attackDecoy },
   { icon: '🧬', name: 'Bad firmware', kind: 'drone', fn: sim.attackFirmware },
-  { icon: '🦖', name: 'Godzilla', kind: 'area', fn: sim.unleashGodzilla },
+];
+
+// Big hazards get their own buttons on the map so they are one tap away.
+const QUICK = [
+  { name: 'Godzilla', kind: 'area', fn: sim.unleashGodzilla },
+  { name: 'Rogue drone', kind: 'area', fn: sim.unleashRogue },
 ];
 
 function launch(a) {
@@ -51,6 +55,7 @@ $('threatItems').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   launch(b.dataset.i === 'rand' ? ATTACKS[Math.floor(Math.random() * ATTACKS.length)] : ATTACKS[+b.dataset.i]);
 };
+$('threatQuick').onclick = e => { const b = e.target.closest('button'); if (b) launch(QUICK[+b.dataset.q]); };
 $('btnThreats').onclick = () => { $('threatMenu').hidden = !$('threatMenu').hidden; };
 $('shieldSeg').onclick = e => {
   const b = e.target.closest('button'); if (!b || !S.mission) return;
