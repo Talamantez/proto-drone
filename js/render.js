@@ -29,6 +29,8 @@ export function renderUi(force) {
     if (S.R.zilla) { const ll = S.P.f.toLL(S.R.zilla.pos); layers.zilla.eachLayer(l => l.setLatLng(ll)); }
     else { S.map.removeLayer(layers.zilla); layers.zilla = null; }
   }
+  if (S.R.rogue && !layers.rogue) layers.rogue = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="zilla-icon">🛸</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false }).addTo(S.map);
+  if (layers.rogue) { if (S.R.rogue) layers.rogue.setLatLng(S.P.f.toLL(S.R.rogue.pos)); else { S.map.removeLayer(layers.rogue); layers.rogue = null; } }
   const now = performance.now();
   if (!force && now - S.R.lastUi < 250) return;
   S.R.lastUi = now;

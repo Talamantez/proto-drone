@@ -173,3 +173,16 @@ test('a forged RTL is obeyed unless commands are signed; the audit resumes the d
   const b = makeMission(); b.def.audit = true; run(30); attackCmd(1); run(80);
   assert.ok(!S.R.d[1].rtl && !S.R.d[1].landed && b.sec.resumed === 1, 'audit resumed');
 });
+
+test('rogue drone: hijacks over an open radio, rams when commands are signed, evaded by detect-and-avoid', async () => {
+  const { unleashRogue } = await import('../js/sim.js');
+  const lostCount = () => S.R.d.filter(d => d.lost).length;
+  const a = makeMission(); run(30); unleashRogue(); run(400);
+  assert.ok(a.sec.hijacked >= 1 && lostCount() >= 1, 'undefended: a drone is stolen');
+  const b = makeMission(); b.def.auth = true; run(30); unleashRogue(); run(400);
+  assert.ok(b.sec.hijacked === 0 && b.sec.rejected >= 1 && b.sec.collisions >= 1, 'signed: takeover refused, but it still rams');
+  const c = makeMission(); c.def.auth = c.def.daa = true; run(30); unleashRogue(); run(400);
+  assert.ok(c.sec.hijacked === 0 && c.sec.collisions === 0 && c.sec.evasions >= 1 && lostCount() === 0, 'signed + detect-and-avoid: no losses');
+  run(3600);
+  assert.ok(S.R.rogue === null);
+});

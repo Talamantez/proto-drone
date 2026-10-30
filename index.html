@@ -120,7 +120,11 @@
     <div class="chk"><input type="checkbox" id="defGnss"><span>GNSS integrity check: cross-check the GPS fix against inertial / visual navigation</span></div>
     <div class="chk"><input type="checkbox" id="defAuth"><span>Signed commands: drones reject unsigned "GCS" orders</span></div>
     <div class="chk"><input type="checkbox" id="defAudit"><span>GCS audit: unexplained return-home on a healthy link triggers a signed resume</span></div>
-    <div class="dim">Start with all three off, launch an attack from the map (🛰 / 🎭), then switch them on and compare the reports.</div>
+    <div class="chk"><input type="checkbox" id="defDaa"><span>Detect-and-avoid: sense unknown aircraft nearby and evade</span></div>
+    <div class="dim">Start with all off, launch an attack from the map (🛰 / 🎭), then switch them on and compare the reports.</div>
+
+    <h2>Threat library</h2>
+    <div id="threatList"></div>
 
     <h2>Heritage pre-flight checklist (gates Start when profile is on)</h2>
     <div id="checks"></div>
@@ -187,7 +191,7 @@
         <button id="dbCancel" class="when-drawing">Cancel</button>
       </div>
     </div>
-    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div><button id="btnGps" class="atk" title="Drag one drone's GPS fix away from reality">🛰 GPS spoof</button><button id="btnCmd" class="atk" title="Inject a forged return-to-launch command posing as the GCS">🎭 Forged RTL</button><button id="btnZilla" class="zilla" title="Unleash a monster: it jams comms, destroys drones in its path and tramples ground. Drones hold, reroute work and cut losses.">🦖 Godzilla</button></div>
+    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div><button id="btnRogue" class="atk" title="A hostile drone chases the fleet: takeover over open radio, then collision">🛸 Rogue drone</button><button id="btnGps" class="atk" title="Drag one drone's GPS fix away from reality">🛰 GPS spoof</button><button id="btnCmd" class="atk" title="Inject a forged return-to-launch command posing as the GCS">🎭 Forged RTL</button><button id="btnZilla" class="zilla" title="Unleash a monster: it jams comms, destroys drones in its path and tramples ground. Drones hold, reroute work and cut losses.">🦖 Godzilla</button></div>
   </div>
 </div>
 <div id="veil" hidden></div>

@@ -171,3 +171,6 @@ button.cta:hover:not(:disabled) { background: #5bf09b; border-color: #b4ffd3; }
 .zilla-icon { font-size: 30px; line-height: 30px; text-align: center; filter: drop-shadow(0 0 6px #d4605a); }
 #hudFaults .atk { width: 100%; margin-top: 6px; background: #3b2a12; border-color: #d9a441; color: #ffe6b3; font-weight: 700; }
 #report .timeline li.attack { border-color: #ff7b72; }
+#threatList details { border-bottom: 1px solid var(--line); padding: 3px 0; }
+#threatList summary { cursor: pointer; } #threatList .tag { float: right; font-size: 10px; color: var(--dim); }
+#threatList .tag.live { color: var(--ok); } #threatList p { margin: 3px 0 5px; color: var(--dim); }

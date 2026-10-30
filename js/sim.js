@@ -20,7 +20,7 @@ export function resetRun(m) {
   Object.assign(m, {
     dist: [], covered: [], gcsCovered: [], found: [], dr: [], gs: [], simT: 0, alerts: 0, status: 'planned',
     stats: freshStats(), assignN: 0, faults: Array.from({ length: m.params.n }, () => ({ lte: true, lora: true })),
-    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false }, sec: { gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
+    checks: [], fired: [], incidents: [], written: [], def: m.def || { gnss: false, auth: false, audit: false, daa: false }, sec: { rogue: 0, hijacked: 0, collisions: 0, evasions: 0, gps: 0, cmd: 0, rejected: 0, alarms: 0, maxErr: 0, resumed: 0 },
   });
 }
 export function scatter(m) {
@@ -147,6 +147,49 @@ function spoofTick(d) {
     d.gnssAlarm = true; d.spoof = null; sec().alarms++;
     incident(`D${d.i + 1} GNSS integrity alarm: fix disagrees with inertial/visual navigation by ${err.toFixed(0)} m; GNSS rejected, flying on visual-inertial and correcting`, 'workaround');
   }
+}
+// --- Rogue drone ---
+// A hostile aircraft chases the nearest fleet drone. Within takeover range it tries to seize control over the unauthenticated radio
+// (stopped by signed commands); failing that it rams. Detect-and-avoid makes drones that sense it within ROGUE.sense evade.
+export const ROGUE = { speedK: 1.4, takeover: 100, hit: 15, sense: 170, life: 150 };
+export function unleashRogue() {
+  if (S.R.rogue || !S.P.xy.length) return false;
+  const xy = S.P.xy, cx = xy.reduce((a, p) => a + p[0], 0) / xy.length, cy = xy.reduce((a, p) => a + p[1], 0) / xy.length;
+  const reach = Math.max(...xy.map(p => Math.hypot(p[0] - cx, p[1] - cy))) + 120, a = S.R.rng() * 2 * Math.PI;
+  S.R.rogue = { pos: [cx + Math.cos(a) * reach, cy + Math.sin(a) * reach], t1: S.R.t + ROGUE.life, tried: new Set() };
+  sec().rogue++;
+  incident('ATTACK: unidentified drone enters the survey area and closes on the fleet', 'attack');
+  return true;
+}
+function rogueTick() {
+  const r = S.R.rogue, m = S.mission, def = m.def || {};
+  if (!r) return;
+  const live = S.R.d.filter(d => !d.lost && !d.landed && !d.hijack);
+  const tgt = live.reduce((b, d) => (!b || hypH(tp(d), r.pos) < hypH(tp(b), r.pos) ? d : b), null);
+  if (!tgt || S.R.t > r.t1) { S.R.rogue = null; incident(tgt ? 'The rogue drone ran out of endurance and left' : 'The rogue drone found nothing left to attack and left', 'attack'); return; }
+  const to = tp(tgt), dist = hypH(to, r.pos);
+  r.vel = [(to[0] - r.pos[0]) / (dist || 1) * m.params.speed * ROGUE.speedK, (to[1] - r.pos[1]) / (dist || 1) * m.params.speed * ROGUE.speedK];
+  r.pos = [r.pos[0] + r.vel[0] * DT, r.pos[1] + r.vel[1] * DT];
+  if (dist < ROGUE.takeover && !r.tried.has(tgt.i)) {
+    r.tried.add(tgt.i);
+    if (def.auth) { sec().rejected++; incident(`D${tgt.i + 1} rejected the rogue's takeover attempt (commands are signed)`, 'workaround'); }
+    else { tgt.hijack = { t1: S.R.t + 40 }; sec().hijacked++; incident(`D${tgt.i + 1} HIJACKED: the rogue seized control over the open radio link and is flying it away`, 'loss'); }
+  }
+  if (dist < ROGUE.hit && !tgt.hijack) {
+    tgt.lost = true; tgt.landed = true; sec().collisions++;
+    incident(`D${tgt.i + 1} destroyed in a collision with the rogue drone`, 'loss');
+  }
+}
+function evadeRogue(d) {
+  const r = S.R.rogue, m = S.mission, def = m.def || {};
+  const on = !!r && !!def.daa && hypH(tp(d), r.pos) < ROGUE.sense;
+  if (on && !d.evade) { sec().evasions++; incident(`D${d.i + 1} detect-and-avoid: unknown aircraft ${hypH(tp(d), r.pos).toFixed(0)} m away, evading`, 'workaround'); }
+  if (!on && d.evade) { incident(`D${d.i + 1} clear of the unknown aircraft, rejoining survey`, 'workaround'); d.rejoin = true; }
+  d.evade = on;
+  if (!on) return false;
+  const p = tp(d), dist = hypH(p, r.pos) || 1, sp = m.params.speed * 1.8 * DT;
+  d.pos = [d.pos[0] + (p[0] - r.pos[0]) / dist * sp, d.pos[1] + (p[1] - r.pos[1]) / dist * sp, d.pos[2]];
+  return true;
 }
 function zillaTick() {
   const z = S.R.zilla, m = S.mission;
@@ -280,6 +323,12 @@ export function droneTick(d) {
   const m = S.mission, i = d.i;
   if (d.lost) return;
   spoofTick(d);
+  if (d.hijack) {
+    const r = S.R.rogue, vel = r && r.vel ? r.vel : [m.params.speed, 0];
+    d.pos = [d.pos[0] + vel[0] * DT, d.pos[1] + vel[1] * DT, d.pos[2]];
+    if (S.R.t > d.hijack.t1) { d.lost = true; d.landed = true; incident(`D${i + 1} is gone: stolen by the rogue drone`, 'loss'); }
+    return;
+  }
   const age = l => S.R.t - d.lastGcs[l];
   d.link = age('lte') < LINK_FRESH ? 'lte' : age('lora') < LINK_FRESH ? 'lora' : null;
   const mode = modeOf(d);
@@ -310,6 +359,8 @@ export function droneTick(d) {
     const step = m.params.speed * DT, dist = hyp(d.pos, S.P.base);
     if (dist <= step) { d.pos = S.P.base; d.landed = true; hooks.log(`D${i + 1} landed at base`, 'failsafe'); }
     else d.pos = d.pos.map((v, k) => v + (S.P.base[k] - v) * step / dist);
+  } else if (!d.rtl && evadeRogue(d)) {
+    // detect-and-avoid: fly directly away from the unknown aircraft
   } else if (d.rejoin) {
     const step = m.params.speed * DT, to = posAtPath(d.path, d.cum, m.dist[i]), dist = hyp(d.pos, to);
     if (dist <= step) { d.pos = to; d.rejoin = false; hooks.log(`D${i + 1} back on survey path`, 'failsafe'); }
@@ -452,12 +503,13 @@ export function step() {
     hooks.log(`Scripted incident: ${e.text}`, 'fault');
   });
   zillaTick();
+  rogueTick();
   deliver();
   S.R.d.forEach(droneTick);
   gcsTick();
   separationCheck();
   const idle = S.R.d.every(d => { const md = modeOf(d); return md === 'DONE' || md === 'LANDED' || md === 'LOST'; }) && S.R.g.every(g => !g.assigns.length);
-  if (!idle || S.R.zilla) { S.R.idleSince = null; return true; }
+  if (!idle || S.R.zilla || S.R.rogue) { S.R.idleSince = null; return true; }
   if (S.R.idleSince === null) S.R.idleSince = S.R.t;
   const drained = S.R.d.every(d => !d.outbox.length && !d.newCells.length);
   return !(drained || S.R.t - S.R.idleSince > 60);

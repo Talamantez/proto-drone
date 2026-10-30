@@ -1,6 +1,7 @@
 // Map-side run controls and link fault buttons.
 import { $, setHint } from './util.js';
-import { attackCmd, attackGps, unleashGodzilla } from './sim.js';
+import { THREATS } from './threats.js';
+import { attackCmd, attackGps, unleashGodzilla, unleashRogue } from './sim.js';
 import { S } from './state.js';
 import { logEvent } from './eventlog.js';
 import { renderUi } from './render.js';
@@ -15,6 +16,7 @@ export function faultClick(e) {
   logEvent(`Fault injection: D${i + 1} ${l.toUpperCase()} ${f[l] ? 'restored' : 'cut'}`, 'fault');
   renderUi(true); tourSignal('fault');
 }
+$('threatList').innerHTML = THREATS.map(t => `<details><summary>${t.name}<span class="tag ${t.sim ? 'live' : ''}">${t.sim ? 'simulated' : 'roadmap'}</span></summary><p><b>Threat:</b> ${t.what}<br><b>Defence:</b> ${t.defence}</p></details>`).join('');
 const attack = fn => () => {
   if (!S.mission || !S.R) return;
   if (!S.running) { setHint('Press Start first: attacks only work on a live survey.'); return; }
@@ -22,8 +24,13 @@ const attack = fn => () => {
   if (!live.length || !fn(live[Math.floor(S.R.rng() * live.length)].i)) setHint('No drone is available to attack.');
   else renderUi(true);
 };
+$('btnRogue').onclick = () => {
+  if (!S.mission || !S.R) return;
+  if (!S.running) { setHint('Press Start first: the rogue drone needs a live survey to attack.'); return; }
+  if (!unleashRogue()) setHint('A rogue drone is already in the area.'); else renderUi(true);
+};
 $('btnGps').onclick = attack(attackGps); $('btnCmd').onclick = attack(attackCmd);
-for (const [id, k] of [['defGnss', 'gnss'], ['defAuth', 'auth'], ['defAudit', 'audit']]) {
+for (const [id, k] of [['defGnss', 'gnss'], ['defAuth', 'auth'], ['defAudit', 'audit'], ['defDaa', 'daa']]) {
   $(id).onchange = e => {
     if (!S.mission) return;
     S.mission.def = S.mission.def || {}; S.mission.def[k] = e.target.checked;

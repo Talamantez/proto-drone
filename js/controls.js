@@ -71,7 +71,7 @@ export function setControls() {
   $('dbDemo').hidden = has;
   $('drawBar').classList.toggle('has-mission', has);
   $('hudFaults').hidden = !has;
-  for (const [id, k] of [['defGnss', 'gnss'], ['defAuth', 'auth'], ['defAudit', 'audit']]) $(id).checked = has && !!(S.mission.def || {})[k]; $('libSave').disabled = !has;
+  for (const [id, k] of [['defGnss', 'gnss'], ['defAuth', 'auth'], ['defAudit', 'audit'], ['defDaa', 'daa']]) $(id).checked = has && !!(S.mission.def || {})[k]; $('libSave').disabled = !has;
   $('btnEnv').disabled = !has; $('btnPois').disabled = !area; $('btnSnap').disabled = !area || !S.mission.pois.length; $('btnUnsnap').disabled = !area || !S.mission.baseLL;
   $('btnRun').disabled = !has || S.mission.status === 'complete';
   document.querySelectorAll('#checks input').forEach((el, i) => { el.disabled = !has; el.checked = has && !!S.mission.checks[i]; });

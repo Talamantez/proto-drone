@@ -91,9 +91,9 @@ export function openReport() {
   if (r.alerts) right.append(el('div', 'dim', `${r.alerts} separation alert${r.alerts > 1 ? 's' : ''} logged.`));
 
   if (r.attacked) {
-    const on = Object.entries(r.defences).filter(([, v]) => v).map(([k]) => ({ gnss: 'GNSS integrity', auth: 'signed commands', audit: 'GCS audit' }[k]));
+    const on = Object.entries(r.defences).filter(([, v]) => v).map(([k]) => ({ gnss: 'GNSS integrity', daa: 'detect-and-avoid', auth: 'signed commands', audit: 'GCS audit' }[k]));
     card.append(el('h4', null, 'Security'));
-    card.append(el('div', 'dim', `Attacks: ${r.sec.gps} GPS spoof, ${r.sec.cmd} forged command. Defences on: ${on.length ? on.join(', ') : 'none'}.<br>` +
+    card.append(el('div', 'dim', `Attacks: ${r.sec.gps} GPS spoof, ${r.sec.cmd} forged command, ${r.sec.rogue || 0} rogue drone. Defences on: ${on.length ? on.join(', ') : 'none'}.<br>` +
       `GNSS alarms ${r.sec.alarms}, forged commands rejected ${r.sec.rejected}, drones resumed by GCS ${r.sec.resumed}, worst position error ${Math.round(r.sec.maxErr)} m.`));
   }
   if (r.incidents.length) {
