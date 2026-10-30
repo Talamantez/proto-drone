@@ -1,0 +1,17 @@
+{
+  "name": "proto-drone",
+  "private": true,
+  "type": "module",
+  "description": "Fleet comms survey simulator (static site, no build step)",
+  "scripts": {
+    "test": "node --test tests/",
+    "lint": "eslint js tests",
+    "serve": "python3 -m http.server 8000",
+    "e2e": "python3 tests/e2e/e2e.py"
+  },
+  "devDependencies": {
+    "acorn": "^8.14.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
+  }
+}

@@ -1,12 +1,10 @@
-// Headless analytic mission model. Pulls the planner geometry (cap, frame, plan) out of index.html so the
+// Headless analytic mission model. Imports the planner (cap, frame, plan) from js/planner.js so the
 // sweep can't drift from the app. Reads a JSON array of parameter objects on stdin, writes outputs to stdout.
 // `node tools/model.js --check` compares the analytic path lengths against the app's plan() on small sites.
-'use strict';
-const fs = require('fs'), path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const src = html.split('<script>').pop().split('</script>')[0];
-const a = src.indexOf('const M_LAT'), b = src.indexOf('const $ = id =>');
-const app = new Function(`${src.slice(a, b)}; return { cap, plan, buildCum, M_LAT };`)();
+import { cap, plan, buildCum } from '../js/planner.js';
+import { M_LAT } from '../js/constants.js';
+
+const app = { cap, plan, buildCum, M_LAT };
 
 const AVIONICS_W = 15, VH = 5, CDA = 0.02, RHO = 1.2, DRONES_PER_CREW = 2, PACK_USE = 0.8, DRONE_LIFE_H = 500, PACK_CYCLES = 300, RESERVE = 0.25;
 const power = (v, hover) => {
