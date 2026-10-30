@@ -58,7 +58,30 @@
   #hwBar span { background: rgba(18,22,26,.85); padding: 2px 7px; border-radius: 3px; border: 1px solid var(--line); }
   #hwDiv { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 4px #000; z-index: 999; pointer-events: none; }
   .envleg i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 1px solid #000; vertical-align: -1px; }
-  .tour-hl { outline: 2px solid var(--warn); outline-offset: 3px; border-radius: 3px; position: relative; z-index: 400; animation: pulse 1.4s ease-in-out infinite; }
+  #hud { position: absolute; top: 10px; left: 58px; z-index: 1000; display: flex; gap: 6px; align-items: center; background: rgba(24,29,34,.92); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; box-shadow: 0 2px 10px rgba(0,0,0,.5); white-space: nowrap; }
+  #hud button { padding: 5px 12px; }
+  #hud .primary { min-width: 72px; font-weight: 600; }
+  #hudStat { color: var(--dim); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  #hudStat b { color: var(--fg); }
+  #hudFaults { position: absolute; top: 88px; left: 10px; z-index: 1000; background: rgba(24,29,34,.92); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  #hudFaults[hidden], #hud[hidden] { display: none; }
+  #hudFaults .t { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+  #hudFaults .fr { display: flex; gap: 4px; align-items: center; margin: 2px 0; }
+  #hudFaults .fr b { width: 26px; }
+  #hudFaults button { padding: 1px 7px; font-size: 11px; }
+  #lyr { position: absolute; top: 10px; right: 10px; z-index: 1000; width: 250px; max-width: calc(100% - 20px); background: rgba(24,29,34,.94); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.5); font-size: 11px; }
+  #lyr .lhead { width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 9px; font-weight: 600; }
+  #lyr .lbody { max-height: min(60vh, 440px); overflow-y: auto; border-top: 1px solid var(--line); }
+  #lyr .lrow { border-bottom: 1px solid var(--line); padding: 3px 5px; }
+  #lyr .lline { display: flex; align-items: center; gap: 4px; }
+  #lyr .lline .lname { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #lyr .lline .lname.off { text-decoration: none; color: var(--dim); }
+  #lyr button.mini { padding: 0 5px; font-size: 11px; line-height: 16px; }
+  #lyr .eye { width: 22px; padding: 0; }
+  #lyr .lctl { display: flex; gap: 6px; align-items: center; padding: 4px 2px 3px 26px; }
+  #lyr .lctl input { flex: 1; min-width: 0; }
+  #lyr .lctl select { width: 96px; flex: none; }
+  .tour-hl { outline: 2px solid var(--warn); outline-offset: 3px; border-radius: 3px; animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { outline-color: transparent; } }
   #tour { position: fixed; z-index: 2000; width: min(340px, calc(100vw - 24px)); background: #20272e; border: 1px solid var(--warn); border-radius: 6px; padding: 12px 14px; box-shadow: 0 8px 28px rgba(0,0,0,.6); font-size: 13px; line-height: 1.5; }
   #tour h3 { margin: 0 0 6px; font-size: 14px; }
@@ -69,6 +92,10 @@
   #veil { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1999; }
   #veil[hidden], #tour[hidden] { display: none; }
   @media (max-width: 800px) {
+    #hudStat { display: none; }
+    #lyr:not([style*='auto']) { width: 190px; }
+    #lyr .lbody { max-height: 24vh; }
+    #hudFaults { top: 56px; }
     #app { grid-template-columns: 1fr; grid-template-rows: 40% 60%; }
     #side { order: 2; border-right: 0; border-top: 1px solid var(--line); }
   }
@@ -96,6 +123,12 @@
       <button id="btnFinish" disabled>Close polygon</button>
       <button id="btnDelete" disabled>Delete</button>
     </div>
+
+    <h2>Polygon library</h2>
+    <select id="libSel"></select>
+    <div class="row"><button id="libUse" disabled>Use as survey area</button><button id="libSave" disabled>Save current area</button><button id="libDel" disabled>Delete</button></div>
+    <div class="row"><button id="libExport">Export GeoJSON</button><button id="libImport">Import GeoJSON</button><input type="file" id="libFile" accept=".geojson,.json,application/geo+json,application/json" hidden></div>
+    <div class="dim" id="libNote">Samples are built in. Your saved areas stay in this browser; export to keep or share them.</div>
 
     <h2>Site challenges (arenas, not real boundaries)</h2>
     <select id="pPreset">
@@ -149,11 +182,11 @@
     <div class="chk"><input type="checkbox" id="ovWater"><span>Surface-water change 1984–2021 · EU JRC (new / lost water)</span></div>
     <div class="chk"><input type="checkbox" id="ovFlood"><span>Flood hazard zones · FEMA (USA only)</span></div>
     <label><span>NASA date</span><input type="date" id="ovDate"></label>
-    <label><span>Overlay opacity</span><input type="range" id="ovOp" min="20" max="100" value="70"><span class="val" id="vOvOp"></span></label>
+    <div class="dim">Opacity, blend mode and stacking order for every layer are in the ☰ Layers panel on the map.</div>
     <div class="dim">Date blank = latest. NDVI covers roughly the last year; if tiles go blank, pick a more recent date.</div>
 
     <h2>Urban decay &amp; renewal</h2>
-    <div class="row"><button id="btnEnv" disabled>Fetch land use, heritage &amp; decay hints</button><label style="margin:0"><input type="checkbox" id="envShow" checked> show</label></div>
+    <div class="row"><button id="btnEnv" disabled>Fetch land use, heritage &amp; decay hints</button></div>
     <div class="dim envleg"><i style="background:#d4605a"></i>abandoned / disused / ruin <i style="background:#4ac8d8"></i>construction / brownfield <i style="background:#b07fe0"></i>heritage <i style="background:#8a949e"></i>building <i style="background:#5fae6b"></i>green</div>
     <div id="envNote" class="dim" style="white-space:pre-line">Draw an area, then fetch. Uses volunteer-mapped OpenStreetMap tags, so “none found” is not “no decay”.</div>
     <label><span>Past imagery</span><select id="hwSel"><option>loading…</option></select></label>
@@ -227,7 +260,10 @@
     <h2>Event log (persisted)</h2>
     <div class="pane" id="log"></div>
   </aside>
-  <div id="map"></div>
+  <div id="map">
+    <div id="hud"><button id="hudRun" class="primary" disabled>Start</button><button id="hudReset" disabled>Reset</button><span id="hudStat">Time <b id="hTime">–</b> · Coverage <b id="hCov">–</b> · Found <b id="hFound">–</b></span></div>
+    <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div></div>
+  </div>
 </div>
 <div id="veil" hidden></div>
 <div id="tour" hidden role="dialog" aria-live="polite"></div>
@@ -625,7 +661,7 @@ function scatter(m) {
 
 // ================= Map layers / runtime construction =================
 function clearMission() {
-  ['poly', 'cells', 'finds', 'base', 'pois', 'env'].forEach(k => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
+  ['poly', 'cells', 'finds', 'base', 'pois', 'env', 'libPrev'].forEach(k => { if (layers[k]) { map.removeLayer(layers[k]); layers[k] = null; } });
   layers.d.forEach(o => ['trail', 'link', 'tag', 'belief'].forEach(k => map.removeLayer(o[k]))); layers.d = [];
 }
 
@@ -636,7 +672,7 @@ function paintCell(ci, state) {
 }
 function addFindMarker(fd) {
   const at = fd.z === undefined ? '' : ` at ${fd.z.toFixed(0)} m height`;
-  L.circleMarker(fd.ll, { radius: 5, color: '#fff', weight: 1, fillColor: '#c4524d', fillOpacity: 1 })
+  L.circleMarker(fd.ll, { pane: 'p_survey', radius: 5, color: '#fff', weight: 1, fillColor: '#c4524d', fillOpacity: 1 })
     .bindTooltip(`Anomaly #${fd.id}${at}: detected by D${fd.drone + 1} at ${fmtT(fd.t)}, confirmed at GCS ${fmtT(fd.tc)}`).addTo(layers.finds);
 }
 
@@ -665,17 +701,17 @@ function build(preserve) {
   const m = mission;
   P = plan(m);
   if (!m.hidden || !preserve) m.hidden = scatter(m);
-  const outline = { color: '#fff', weight: 1.5, fill: false, dashArray: '6 4' };
+  const outline = { pane: 'p_survey', color: '#fff', weight: 1.5, fill: false, dashArray: '6 4' };
   layers.poly = (P.fac ? L.polyline(m.poly, outline) : L.polygon(m.poly, outline)).addTo(map);
-  layers.base = L.marker(P.f.toLL(P.base), { title: 'Base / GCS' }).addTo(map);
+  layers.base = L.marker(P.f.toLL(P.base), { title: 'Base / GCS', pane: 'p_fleet' }).addTo(map);
   if (P.fac) {
     const F = P.fac, edge = u => P.f.toLL([F.A[0] + F.t[0] * u + F.nr[0] * F.c.stand, F.A[1] + F.t[1] * u + F.nr[1] * F.c.stand]);
-    layers.cells = L.layerGroup([L.polyline([edge(0), edge(F.L)], { color: '#d9a441', weight: 1, dashArray: '2 6', interactive: false })]).addTo(map);
+    layers.cells = L.layerGroup([L.polyline([edge(0), edge(F.L)], { pane: 'p_survey', color: '#d9a441', weight: 1, dashArray: '2 6', interactive: false })]).addTo(map);
     initElev();
   } else {
-    const canvas = L.canvas({ padding: 0.3 });
+    const canvas = L.canvas({ padding: 0.3, pane: 'p_survey' });
     layers.cells = L.layerGroup(P.cells.map(c =>
-      L.polygon(c.corners, { renderer: canvas, stroke: false, fillColor: '#fff', fillOpacity: 0.07, interactive: false }))).addTo(map);
+      L.polygon(c.corners, { pane: 'p_survey', renderer: canvas, stroke: false, fillColor: '#fff', fillOpacity: 0.07, interactive: false }))).addTo(map);
   }
   $('elevWrap').hidden = !P.fac;
   applyWeights(); drawPois();
@@ -714,12 +750,12 @@ function build(preserve) {
 
     const color = COLORS[i % COLORS.length];
     layers.d.push({
-      trail: L.polyline(basePath.filter((_, k) => cumAt(basePath, k) <= m.dist[i]).map(P.f.toLL).concat([P.f.toLL(d.pos)]), { color, weight: 2, opacity: 0.7 }).addTo(map),
-      link: L.polyline([P.f.toLL(P.base), P.f.toLL(d.pos)], { weight: 1, opacity: 0.7 }).addTo(map),
-      belief: L.circleMarker(P.f.toLL(d.pos), { radius: 8, color, weight: 1.5, fill: false, dashArray: '2 2' }).addTo(map),
+      trail: L.polyline(basePath.filter((_, k) => cumAt(basePath, k) <= m.dist[i]).map(P.f.toLL).concat([P.f.toLL(d.pos)]), { pane: 'p_fleet', color, weight: 2, opacity: 0.7 }).addTo(map),
+      link: L.polyline([P.f.toLL(P.base), P.f.toLL(d.pos)], { pane: 'p_fleet', weight: 1, opacity: 0.7 }).addTo(map),
+      belief: L.circleMarker(P.f.toLL(d.pos), { pane: 'p_fleet', radius: 8, color, weight: 1.5, fill: false, dashArray: '2 2' }).addTo(map),
       tag: L.marker(P.f.toLL(d.pos), {
         icon: L.divIcon({ className: '', iconSize: [26, 16], iconAnchor: [13, 8], html: `<div class="tag" style="background:${color}">D${i + 1}</div>` }),
-        zIndexOffset: 1000,
+        zIndexOffset: 1000, pane: 'p_fleet',
       }).addTo(map),
     });
   });
@@ -1096,6 +1132,11 @@ function renderChallenge() {
 }
 
 const offLL = (c, dx, dy) => [c[0] + dy / M_LAT, c[1] + dx / (M_LAT * Math.cos(c[0] * Math.PI / 180))];
+function presetPoly(s) {
+  if (s.shape === 'line') return [offLL(s.c, -s.w / 2, 0), offLL(s.c, s.w / 2, 0)];
+  const th = (s.bearing || 0) * Math.PI / 180, r = ([x, y]) => [x * Math.cos(th) - y * Math.sin(th), x * Math.sin(th) + y * Math.cos(th)];
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => { const [x, y] = r([a * s.w / 2, b * s.h / 2]); return offLL(s.c, x, y); });
+}
 function loadPreset(key) {
   const s = PRESETS[key];
   if (!s) return;
@@ -1104,18 +1145,13 @@ function loadPreset(key) {
   p.speed = s.params.speed ?? Math.max(0.5, Math.floor(cap(p).vMax * 2) / 2);   // slowest limit wins
   writeParams(p);
   $('missionName').value = s.title;
-  let poly;
-  if (s.shape === 'line') poly = [offLL(s.c, -s.w / 2, 0), offLL(s.c, s.w / 2, 0)];
-  else {
-    const th = (s.bearing || 0) * Math.PI / 180, r = ([x, y]) => [x * Math.cos(th) - y * Math.sin(th), x * Math.sin(th) + y * Math.cos(th)];
-    poly = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => { const [x, y] = r([a * s.w / 2, b * s.h / 2]); return offLL(s.c, x, y); });
-  }
+  const poly = presetPoly(s);
   mission = newMission(poly, key);
   build(false);
   map.fitBounds(layers.poly.getBounds().pad(0.6), { maxZoom: s.zoom });   // zoom cap: remote sites lack high-zoom imagery
   saveMission().then(() => refreshMissionList(mission.id));
   logEvent(`Challenge loaded: ${s.title} (${P.cells.length} cells, ${mission.params.n} drones, ${mission.params.speed} m/s)`, 'plan');
-  setControls(); setHint(s.note);
+  setControls(); setHint(s.note); tourSignal('draw');
 }
 
 // ================= UI =================
@@ -1145,7 +1181,8 @@ function renderUi(force) {
   $('sCov').textContent = pct(R.gcsCov) + '%'; $('sTruth').textContent = pct(R.cov) + '%';
   const det = new Set(); R.d.forEach(d => d.detected.forEach(x => det.add(x)));
   $('sFound').textContent = `${mission.found.length} / ${det.size} / ${mission.hidden.length}`;
-  $('qCov').textContent = pct(R.gcsCov) + '%'; $('qFound').textContent = `${mission.found.length} / ${mission.hidden.length}`;
+  $('qCov').textContent = $('hCov').textContent = pct(R.gcsCov) + '%'; $('qFound').textContent = $('hFound').textContent = `${mission.found.length} / ${mission.hidden.length}`;
+  $('hTime').textContent = fmtT(mission.simT);
   $('sSep').textContent = mission.alerts;
   $('sMsg').textContent = `${S.sent} / ${S.delivered}`;
   $('sDrop').textContent = `${S.dropLoss} / ${S.dropDown}`;
@@ -1165,6 +1202,10 @@ function renderUi(force) {
       `<td class="${sc}">${g.state}</td><td style="color:${linkColor(d.link)}">${d.link ? d.link.toUpperCase() : 'NONE'}</td>` +
       `<td class="${ac}">${age.toFixed(1)}s</td><td>${g.total ? Math.round(100 * Math.min(1, g.prog / g.total)) : 0}%</td>` +
       `<td><button data-d="${i}" data-l="lte" class="${f.lte ? '' : 'off'}">LTE</button> <button data-d="${i}" data-l="lora" class="${f.lora ? '' : 'off'}">LoRa</button></td></tr>`;
+  }).join('');
+  $('hudFaultRows').innerHTML = R.d.map((d, i) => {
+    const f = mission.faults[i];
+    return `<div class="fr"><b style="color:${COLORS[i % COLORS.length]}">D${i + 1}</b><button data-d="${i}" data-l="lte" class="${f.lte ? '' : 'off'}">LTE</button><button data-d="${i}" data-l="lora" class="${f.lora ? '' : 'off'}">LoRa</button></div>`;
   }).join('');
 
   if (force || now - R.lastLog > 500) {
@@ -1219,6 +1260,7 @@ function setControls() {
   const has = !!mission;
   ['btnPlan', 'btnReset', 'btnDelete', 'btnCsv', 'btnManifest'].forEach(id => $(id).disabled = !has);
   const area = has && (mission.params.mode || 'area') === 'area';
+  $('hudFaults').hidden = !has; $('libSave').disabled = !has;
   $('btnEnv').disabled = !has; $('btnPois').disabled = !area; $('btnSnap').disabled = !area || !mission.pois.length; $('btnUnsnap').disabled = !area || !mission.baseLL;
   $('btnRun').disabled = !has || mission.status === 'complete';
   document.querySelectorAll('#checks input').forEach((el, i) => { el.disabled = !has; el.checked = has && !!mission.checks[i]; });
@@ -1228,7 +1270,7 @@ async function loadMission(id) {
   running = false; $('btnRun').textContent = 'Start';
   if (!id) {
     mission = null; R = null; clearMission(); $('drones').innerHTML = ''; $('log').textContent = ''; $('msgLog').textContent = '';
-    $('elevWrap').hidden = true; $('chalWrap').hidden = true; ['qTime', 'qCov', 'qFound'].forEach(id => $(id).textContent = '–'); setControls(); return;
+    $('elevWrap').hidden = true; $('chalWrap').hidden = true; ['qTime', 'qCov', 'qFound', 'hTime', 'hCov', 'hFound'].forEach(id => $(id).textContent = '–'); $('hudFaultRows').innerHTML = ''; setControls(); return;
   }
   mission = await DB.getMission(id);
   mission.checks = mission.checks || []; mission.fired = mission.fired || [];
@@ -1258,20 +1300,107 @@ function startDraw() {
 function finishDraw() {
   drawing = false; map.getContainer().style.cursor = '';
   map.removeLayer(layers.draw); layers.draw = null; $('btnFinish').disabled = true;
-  mission = newMission(drawPts.slice());
-  mission.params.mode = drawMode;
+  adoptPoly(drawPts.slice(), drawMode);
+}
+function adoptPoly(poly, mode, label) {
+  running = false; $('btnRun').textContent = 'Start';
+  if ($('pMode').value !== mode) { $('pMode').value = mode; updateModeUi(); }
+  if (label) $('missionName').value = label;
+  mission = newMission(poly);
+  mission.params.mode = mode;
   build(false);
+  if (label) map.fitBounds(layers.poly.getBounds().pad(0.3));
   saveMission().then(() => refreshMissionList(mission.id));
-  logEvent(`${drawMode === 'facade' ? 'Wall' : 'Area'} defined: ${P.cells.length} cells, ${mission.params.n} drones, seed ${mission.params.seed}`, 'plan');
-  setControls(); setHint('Plan ready. Start the run; cut links in the fleet table to test failover.');
+  logEvent(`${mode === 'facade' ? 'Wall' : 'Area'} defined: ${P.cells.length} cells, ${mission.params.n} drones, seed ${mission.params.seed}`, 'plan');
+  setControls(); setHint('Plan ready. Press Start on the map; use “Break a link” (top left of the map) to test failover.');
+  tourSignal('draw');
 }
 
 // ================= Wire-up =================
 map = L.map('map').setView([40.7508, 14.4869], 17);
-const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
-const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri World Imagery' });
-sat.addTo(map);
-L.control.layers({ Satellite: sat, Streets: osm }).addTo(map);
+const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, pane: 'p_streets', attribution: '© OpenStreetMap' });
+const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, pane: 'p_sat', attribution: 'Esri World Imagery' });
+
+// ---- GIS-style layer stack: every layer lives in its own pane, so visibility, opacity, blend mode and order are pane CSS ----
+const LDEF = {
+  fleet:   { name: 'Fleet & links', pane: 'p_fleet', kind: 'pane' },
+  survey:  { name: 'Survey area & coverage', pane: 'p_survey', kind: 'pane' },
+  poi:     { name: 'Road POIs', pane: 'p_poi', kind: 'pane' },
+  env:     { name: 'Decay / land use (OSM)', pane: 'p_env', kind: 'pane' },
+  ovFlood: { name: 'Flood zones (FEMA, US)', pane: 'p_ovFlood', kind: 'tile', o: .7 },
+  ovWater: { name: 'Surface-water change (JRC)', pane: 'p_ovWater', kind: 'tile', o: .7 },
+  ovNight: { name: 'Night lights (NASA)', pane: 'p_ovNight', kind: 'tile', o: .7 },
+  ovLst:   { name: 'Surface heat (NASA)', pane: 'p_ovLst', kind: 'tile', o: .7 },
+  ovNdvi:  { name: 'Vegetation greenness (NASA)', pane: 'p_ovNdvi', kind: 'tile', o: .7 },
+  hist:    { name: 'Past imagery (swipe)', pane: 'p_hist', kind: 'hist' },
+  streets: { name: 'Streets (OSM)', pane: 'p_streets', kind: 'base' },
+  sat:     { name: 'Satellite (Esri)', pane: 'p_sat', kind: 'base' },
+};
+const LORDER = Object.keys(LDEF);
+const BLENDS = ['normal', 'multiply', 'screen', 'overlay', 'soft-light', 'hard-light', 'difference', 'luminosity'];
+const LP = { order: LORDER.slice(), st: {} };
+try {
+  const j = JSON.parse(localStorage.getItem('layerPanel') || 'null');
+  if (j && Array.isArray(j.order) && j.order.length === LORDER.length && LORDER.every(i => j.order.includes(i))) LP.order = j.order;
+  if (j && j.st && typeof j.st === 'object') LP.st = j.st;
+} catch (e) { /* storage unavailable */ }
+const lSt = id => LP.st[id] = { v: true, o: LDEF[id].o ?? 1, b: 'normal', ...LP.st[id] };
+Object.values(LDEF).forEach(d => map.createPane(d.pane));
+const lSave = () => { try { localStorage.setItem('layerPanel', JSON.stringify(LP)); } catch (e) { /* ignore */ } };
+function lApply(id) {
+  const d = LDEF[id], s = lSt(id), p = map.getPane(d.pane);
+  p.style.zIndex = 210 + LP.order.length - 1 - LP.order.indexOf(id);
+  p.style.opacity = s.o; p.style.mixBlendMode = s.b;
+  if (d.kind === 'pane') p.style.display = s.v ? '' : 'none';
+}
+const lVisible = id => {
+  const k = LDEF[id].kind;
+  return k === 'pane' ? lSt(id).v : k === 'tile' ? $(id).checked : k === 'hist' ? $('hwOn').checked : map.hasLayer(id === 'sat' ? sat : osm);
+};
+function lSetVisible(id, v) {
+  const k = LDEF[id].kind;
+  if (k === 'pane') lSt(id).v = v;
+  else if (k === 'tile') { $(id).checked = v; ovSync(id); }
+  else if (k === 'hist') { if ($('hwOn').disabled) return; $('hwOn').checked = v; hwBuild(); }
+  else { const l = id === 'sat' ? sat : osm; v ? l.addTo(map) : map.removeLayer(l); }
+  lApply(id); lSave(); lRender();
+}
+const lyr = document.createElement('div'); lyr.id = 'lyr'; map.getContainer().appendChild(lyr);
+L.DomEvent.disableClickPropagation(lyr); L.DomEvent.disableScrollPropagation(lyr);
+let lOpen = false, lExp = null;
+function lRender() {
+  lyr.style.width = lOpen ? '' : 'auto';
+  lyr.innerHTML = `<button class="lhead" data-a="toggle">☰ Layers ${lOpen ? '▾' : '▸'}</button>` + (!lOpen ? '' :
+    `<div class="lbody">${LP.order.map((id, i) => {
+      const d = LDEF[id], s = lSt(id), on = lVisible(id), dis = d.kind === 'hist' && $('hwOn').disabled;
+      return `<div class="lrow" data-id="${id}"><div class="lline">` +
+        `<button class="eye" data-a="eye" ${dis ? 'disabled' : ''} title="Show / hide">${on ? '●' : '○'}</button>` +
+        `<span class="lname ${on ? '' : 'off'}" data-a="exp" title="Click for opacity and blend">${d.name}</span>` +
+        `<button class="mini" data-a="up" ${i === 0 ? 'disabled' : ''} title="Raise">▲</button><button class="mini" data-a="down" ${i === LP.order.length - 1 ? 'disabled' : ''} title="Lower">▼</button></div>` +
+        (lExp === id ? `<div class="lctl"><input type="range" data-a="op" min="0" max="100" value="${Math.round(s.o * 100)}" title="Opacity"><select data-a="bl" title="Blend mode">${BLENDS.map(b => `<option${b === s.b ? ' selected' : ''}>${b}</option>`).join('')}</select></div>` : '') +
+        '</div>';
+    }).join('')}</div>`);
+}
+lyr.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const a = b.dataset.a, id = (b.closest('.lrow') || {}).dataset?.id;
+  if (a === 'toggle') { lOpen = !lOpen; lRender(); }
+  else if (a === 'eye') lSetVisible(id, !lVisible(id));
+  else if (a === 'exp') { lExp = lExp === id ? null : id; lRender(); }
+  else if (a === 'up' || a === 'down') {
+    const i = LP.order.indexOf(id), j = i + (a === 'up' ? -1 : 1);
+    if (j >= 0 && j < LP.order.length) { LP.order.splice(i, 1); LP.order.splice(j, 0, id); LORDER.forEach(lApply); lSave(); lRender(); }
+  }
+});
+lyr.addEventListener('input', e => {
+  if (e.target.dataset.a !== 'op') return;
+  const id = e.target.closest('.lrow').dataset.id; lSt(id).o = e.target.value / 100; lApply(id); lSave();
+});
+lyr.addEventListener('change', e => {
+  if (e.target.dataset.a !== 'bl') return;
+  const id = e.target.closest('.lrow').dataset.id; lSt(id).b = e.target.value; lApply(id); lSave();
+});
+LORDER.forEach(lApply); sat.addTo(map); lRender();
 map.on('click', e => {
   if (!drawing || (drawMode === 'facade' && drawPts.length >= 2)) return;
   drawPts.push([e.latlng.lat, e.latlng.lng]); layers.draw.setLatLngs(drawPts);
@@ -1387,7 +1516,7 @@ function drawPois() {
   if (!mission || P.fac) return;
   const cfg = mission.poiCfg, col = Object.fromEntries(TIERS.map(t => [t.id, t.color]));
   layers.pois = L.layerGroup(mission.pois.filter(p => cfg[p.tier].show).map(p =>
-    L.circleMarker(p.ll, { radius: 3 + 4 * p.flow, color: '#000', weight: 1, fillColor: col[p.tier], fillOpacity: .9 })
+    L.circleMarker(p.ll, { pane: 'p_poi', radius: 3 + 4 * p.flow, color: '#000', weight: 1, fillColor: col[p.tier], fillOpacity: .9 })
       .bindTooltip(`${TIERS.find(t => t.id === p.tier).name} · flow ${p.flow.toFixed(2)} · bonus ${poiBonus(p, cfg).toFixed(2)}`))).addTo(map);
 }
 function poiSettingsChanged() {
@@ -1454,6 +1583,7 @@ $('btnRun').onclick = () => {
   }
   running = !running;
   $('btnRun').textContent = running ? 'Pause' : 'Resume';
+  if (running) tourSignal('start');
   if (running) {
     if (!mission.simT) {
       if (mission.params.heritage) logEvent(`Heritage pre-flight signed off (${CHECKS.length}/${CHECKS.length}), standoff ${cap(mission.params).stand.toFixed(1)} m, ${mission.params.gsd} mm/px`, 'start');
@@ -1471,14 +1601,22 @@ $('btnDelete').onclick = async () => {
   if (!mission || !confirm(`Delete “${mission.name}” and its event log?`)) return;
   await DB.delMission(mission.id); await loadMission(''); await refreshMissionList('');
 };
-$('drones').onclick = e => {
+function faultClick(e) {
   const b = e.target.closest('button[data-d]');
   if (!b || !mission) return;
   const i = +b.dataset.d, l = b.dataset.l, f = mission.faults[i];
   f[l] = !f[l];
   logEvent(`Fault injection: D${i + 1} ${l.toUpperCase()} ${f[l] ? 'restored' : 'cut'}`, 'fault');
-  renderUi(true);
+  renderUi(true); tourSignal('fault');
+}
+$('drones').onclick = faultClick; $('hudFaultRows').onclick = faultClick;
+L.DomEvent.disableClickPropagation($('hud')); L.DomEvent.disableClickPropagation($('hudFaults'));
+const mirror = (src, dst) => {
+  const f = () => { dst.textContent = src.textContent; dst.disabled = src.disabled; };
+  new MutationObserver(f).observe(src, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['disabled'] }); f();
 };
+mirror($('btnRun'), $('hudRun')); mirror($('btnReset'), $('hudReset'));
+$('hudRun').onclick = () => $('btnRun').click(); $('hudReset').onclick = () => $('btnReset').click();
 $('btnCsv').onclick = () => {
   const rows = ['t,src,dst,type,link,seq,bytes,latency_ms,drop_reason',
     ...R.log.map(e => [e.t.toFixed(2), nm(e.src), nm(e.dst), e.type, e.link, e.seq, e.size, e.lat === null ? '' : e.lat.toFixed(1), e.why || ''].join(','))];
@@ -1490,8 +1628,8 @@ window.addEventListener('pagehide', saveMission);
 
 // ================= Public data overlays, decay & renewal =================
 const GIBS = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/';
-const gibsLayer = (id, lvl, time) => L.tileLayer(`${GIBS}${id}/default/${time}/GoogleMapsCompatible_Level${lvl}/{z}/{y}/{x}.png`,
-  { maxNativeZoom: lvl, maxZoom: 19, zIndex: 6, attribution: 'NASA GIBS' });
+const gibsLayer = (id, lvl, time, pane) => L.tileLayer(`${GIBS}${id}/default/${time}/GoogleMapsCompatible_Level${lvl}/{z}/{y}/{x}.png`,
+  { maxNativeZoom: lvl, maxZoom: 19, pane, attribution: 'NASA GIBS' });
 const femaFlood = L.TileLayer.extend({
   getTileUrl(c) {   // ArcGIS export for one XYZ tile, in web-mercator metres
     const R = 20037508.342789244, n = 2 ** c.z, sz = 2 * R / n, x0 = -R + c.x * sz, y1 = R - c.y * sz;
@@ -1500,29 +1638,24 @@ const femaFlood = L.TileLayer.extend({
   },
 });
 const overlays = {
-  ovNdvi: () => gibsLayer('MODIS_Terra_NDVI_8Day', 9, $('ovDate').value || 'default'),
-  ovLst: () => gibsLayer('MODIS_Terra_Land_Surface_Temp_Day', 7, $('ovDate').value || 'default'),
-  ovNight: () => gibsLayer('VIIRS_Black_Marble', 8, $('ovNightYr').value),
-  ovWater: () => L.tileLayer('https://storage.googleapis.com/global-surface-water/tiles2021/transitions/{z}/{x}/{y}.png', { maxNativeZoom: 13, maxZoom: 19, zIndex: 6, attribution: 'EC JRC Global Surface Water' }),
-  ovFlood: () => new femaFlood('', { maxZoom: 19, zIndex: 6, attribution: 'FEMA NFHL' }),
+  ovNdvi: pane => gibsLayer('MODIS_Terra_NDVI_8Day', 9, $('ovDate').value || 'default', pane),
+  ovLst: pane => gibsLayer('MODIS_Terra_Land_Surface_Temp_Day', 7, $('ovDate').value || 'default', pane),
+  ovNight: pane => gibsLayer('VIIRS_Black_Marble', 8, $('ovNightYr').value, pane),
+  ovWater: pane => L.tileLayer('https://storage.googleapis.com/global-surface-water/tiles2021/transitions/{z}/{x}/{y}.png', { maxNativeZoom: 13, maxZoom: 19, pane, attribution: 'EC JRC Global Surface Water' }),
+  ovFlood: pane => new femaFlood('', { maxZoom: 19, pane, attribution: 'FEMA NFHL' }),
 };
 const ovLive = {};
 function ovSync(id) {
   if (ovLive[id]) { map.removeLayer(ovLive[id]); ovLive[id] = null; }
   if (!$(id).checked) return;
-  ovLive[id] = overlays[id]().setOpacity(+$('ovOp').value / 100).addTo(map);
+  ovLive[id] = overlays[id](LDEF[id].pane).addTo(map);
 }
-Object.keys(overlays).forEach(id => $(id).addEventListener('change', () => ovSync(id)));
+Object.keys(overlays).forEach(id => $(id).addEventListener('change', () => { ovSync(id); lRender(); }));
 $('ovDate').addEventListener('change', () => ['ovNdvi', 'ovLst'].forEach(ovSync));
 $('ovNightYr').addEventListener('change', () => ovSync('ovNight'));
-$('ovOp').addEventListener('input', () => {
-  $('vOvOp').textContent = $('ovOp').value + '%';
-  Object.values(ovLive).forEach(l => l && l.setOpacity(+$('ovOp').value / 100));
-});
-$('vOvOp').textContent = $('ovOp').value + '%';
 
 // ---- OSM land use, heritage, decay and renewal hints ----
-const envCanvas = L.canvas({ padding: 0.5 });
+const envCanvas = L.canvas({ padding: 0.5, pane: 'p_env' });
 const ENV = { decay: '#d4605a', build: '#4ac8d8', heritage: '#b07fe0', bldg: '#8a949e', green: '#5fae6b', land: '#c9a24a' };
 function envClass(t) {
   const keys = Object.keys(t);
@@ -1539,7 +1672,7 @@ function drawEnv(els) {
   for (const e of els) {
     const t = e.tags || {}, c = envClass(t); cnt[c]++;
     const tip = Object.entries(t).slice(0, 6).map(([k, v]) => `${esc(k)}=${esc(v)}`).join('<br>');
-    const st = { renderer: envCanvas, color: ENV[c], weight: c === 'bldg' || c === 'land' ? 1 : 2, fillColor: ENV[c], fillOpacity: c === 'land' ? .08 : c === 'green' || c === 'heritage' ? .12 : .35 };
+    const st = { pane: 'p_env', renderer: envCanvas, color: ENV[c], weight: c === 'bldg' || c === 'land' ? 1 : 2, fillColor: ENV[c], fillOpacity: c === 'land' ? .08 : c === 'green' || c === 'heritage' ? .12 : .35 };
     let o;
     if (e.type === 'node') o = L.circleMarker([e.lat, e.lon], { ...st, radius: 4, fillOpacity: .9 });
     else if (e.geometry && e.geometry.length > 1) {
@@ -1548,10 +1681,9 @@ function drawEnv(els) {
     }
     if (o) g.addLayer(o.bindTooltip(`<b>${c}</b><br>${tip}`));
   }
-  layers.env = g; if ($('envShow').checked) g.addTo(map);
+  layers.env = g; g.addTo(map);
   return cnt;
 }
-$('envShow').onchange = () => { if (layers.env) $('envShow').checked ? layers.env.addTo(map) : map.removeLayer(layers.env); };
 $('btnEnv').onclick = async () => {
   if (!mission) return;
   const ys = mission.poly.map(p => p[0]), xs = mission.poly.map(p => p[1]), pad = 0.0004;
@@ -1589,7 +1721,7 @@ function hwBuild() {
   if (!$('hwOn').checked) { if (hwBar) hwBar.hidden = hwDiv.hidden = true; return; }
   const sel = $('hwSel'), date = sel.selectedOptions[0].textContent;
   hwLayer = L.tileLayer(`https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${sel.value}/{z}/{y}/{x}`,
-    { maxNativeZoom: 18, maxZoom: 19, zIndex: 3, attribution: 'Esri Wayback' }).addTo(map);
+    { maxNativeZoom: 18, maxZoom: 19, pane: 'p_hist', attribution: 'Esri Wayback' }).addTo(map);
   if (!hwBar) {
     hwBar = document.createElement('div'); hwBar.id = 'hwBar';
     hwBar.innerHTML = '<span id="hwL">Today</span><input type="range" id="hwPos" min="0" max="100" value="50"><span id="hwR"></span>';
@@ -1603,68 +1735,144 @@ function hwBuild() {
   hwLayer.on('load', hwClip); hwClip();
   setHint(`Swipe: left = today, right = Esri imagery release ${date}. Drag the slider along the bottom of the map.`);
 }
-$('hwOn').onchange = hwBuild; $('hwSel').onchange = () => { if ($('hwOn').checked) hwBuild(); };
+$('hwOn').onchange = () => { hwBuild(); lRender(); }; $('hwSel').onchange = () => { if ($('hwOn').checked) hwBuild(); };
 fetch(WAYBACK_CFG).then(r => r.json()).then(cfg => {
   const rel = Object.entries(cfg).map(([id, v]) => ({ id, d: hwTitle(v) })).sort((a, b) => b.d.localeCompare(a.d));
   const want = '2018-01-01', pick = rel.find(r => r.d <= want) || rel[rel.length - 1];
   $('hwSel').textContent = '';
   rel.forEach(r => { const o = document.createElement('option'); o.value = r.id; o.textContent = r.d; $('hwSel').appendChild(o); });
-  $('hwSel').value = pick.id; $('hwOn').disabled = false;
+  $('hwSel').value = pick.id; $('hwOn').disabled = false; lRender();
 }).catch(() => { $('hwSel').innerHTML = '<option>unavailable offline</option>'; });
 
-// ================= Demo + guided tour =================
+// ================= Polygon library =================
 const store = {
   get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
 };
+const libLoad = () => { try { const a = JSON.parse(store.get('polyLib') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+const libStore = a => store.set('polyLib', JSON.stringify(a));
+const libSamples = () => Object.entries(PRESETS).map(([k, p]) => ({ id: 'b:' + k, name: p.title, pts: presetPoly(p), mode: p.shape === 'line' ? 'facade' : 'area' }));
+const libFind = id => libSamples().concat(libLoad()).find(e => e.id === id);
+function libRender(sel) {
+  const el = $('libSel'), opt = e => `<option value="${e.id}">${esc(e.name)} (${e.mode === 'facade' ? 'wall' : e.pts.length + ' pts'})</option>`;
+  const mine = libLoad();
+  el.innerHTML = '<option value="">Pick a polygon…</option>' + `<optgroup label="Samples">${libSamples().map(opt).join('')}</optgroup>` +
+    (mine.length ? `<optgroup label="Saved by you">${mine.map(opt).join('')}</optgroup>` : '');
+  el.value = sel || ''; libSelChanged(false);
+}
+function libSelChanged(fit) {
+  const e = libFind($('libSel').value);
+  $('libUse').disabled = !e; $('libDel').disabled = !e || e.id.startsWith('b:');
+  if (layers.libPrev) { map.removeLayer(layers.libPrev); layers.libPrev = null; }
+  if (!e) return;
+  const st = { pane: 'p_survey', color: '#4ac8d8', weight: 2, dashArray: '4 4', interactive: false };
+  layers.libPrev = (e.mode === 'facade' ? L.polyline(e.pts, st) : L.polygon(e.pts, { ...st, fillOpacity: .08 })).addTo(map);
+  if (fit) map.fitBounds(layers.libPrev.getBounds().pad(0.4), { maxZoom: 17 });
+}
+$('libSel').onchange = () => libSelChanged(true);
+$('libUse').onclick = () => { const e = libFind($('libSel').value); if (e) adoptPoly(e.pts.map(p => p.slice()), e.mode, e.name.replace(/ \(sample\)$/, '')); };
+$('libSave').onclick = () => {
+  if (!mission) return;
+  const all = libLoad(), e = { id: 'u' + Date.now(), name: mission.name || 'Area', pts: mission.poly, mode: mission.params.mode || 'area' };
+  all.push(e); libStore(all); libRender(e.id);
+  $('libNote').textContent = `Saved “${e.name}”. Stored in this browser only; use Export to keep a copy.`;
+};
+$('libDel').onclick = () => {
+  const id = $('libSel').value, e = libFind(id);
+  if (!e || id.startsWith('b:') || !confirm(`Delete “${e.name}” from your library?`)) return;
+  libStore(libLoad().filter(x => x.id !== id)); libRender('');
+};
+const dl = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
+$('libExport').onclick = () => {
+  const list = libLoad().length ? libLoad() : (mission ? [{ name: mission.name, pts: mission.poly, mode: mission.params.mode || 'area' }] : []);
+  if (!list.length) { $('libNote').textContent = 'Nothing to export yet: save an area first.'; return; }
+  const ll = p => [+p[1].toFixed(6), +p[0].toFixed(6)];
+  dl('survey-areas.geojson', JSON.stringify({ type: 'FeatureCollection', features: list.map(e => ({
+    type: 'Feature', properties: { name: e.name, mode: e.mode },
+    geometry: e.mode === 'facade' ? { type: 'LineString', coordinates: e.pts.map(ll) } : { type: 'Polygon', coordinates: [[...e.pts.map(ll), ll(e.pts[0])]] },
+  })) }, null, 2), 'application/geo+json');
+};
+function geoPolys(g, name, out) {
+  if (!g) return;
+  if (g.type === 'FeatureCollection') (g.features || []).forEach(f => geoPolys(f, name, out));
+  else if (g.type === 'Feature') geoPolys(g.geometry, (g.properties && g.properties.name) || name, out);
+  else if (g.type === 'GeometryCollection') (g.geometries || []).forEach(x => geoPolys(x, name, out));
+  else if (g.type === 'Polygon' && g.coordinates[0]) out.push({ name, mode: 'area', ring: g.coordinates[0] });
+  else if (g.type === 'MultiPolygon') g.coordinates.forEach(c => c[0] && out.push({ name, mode: 'area', ring: c[0] }));
+  else if (g.type === 'LineString' && g.coordinates.length === 2) out.push({ name, mode: 'facade', ring: g.coordinates });
+}
+$('libImport').onclick = () => $('libFile').click();
+$('libFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const raw = []; geoPolys(JSON.parse(await f.text()), f.name.replace(/\.[^.]+$/, ''), raw);
+    const all = libLoad(); let n = 0, skipped = 0;
+    raw.slice(0, 50).forEach((r, i) => {
+      let pts = r.ring.map(c => [+c[1], +c[0]]).filter(p => isFinite(p[0]) && isFinite(p[1]) && Math.abs(p[0]) <= 90 && Math.abs(p[1]) <= 180);
+      if (r.mode === 'area' && pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts.pop();
+      if (pts.length < (r.mode === 'facade' ? 2 : 3) || pts.length > 200) { skipped++; return; }
+      all.push({ id: 'u' + Date.now() + '_' + i, name: raw.length > 1 ? `${r.name} ${i + 1}` : r.name, pts, mode: r.mode }); n++;
+    });
+    libStore(all); libRender(n ? all[all.length - 1].id : ''); if (n) libSelChanged(true);
+    $('libNote').textContent = `Imported ${n} area${n === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} (needs 3–200 points, or a 2-point line for a wall)` : ''}. Holes and extra Multi-parts are ignored.`;
+  } catch (err) { $('libNote').textContent = 'Could not read that file as GeoJSON: ' + err.message; }
+};
+libRender('');
+
+// ================= Demo + guided tour =================
 const TOUR = [
-  { center: true, title: 'Welcome aboard 👋', html: `<p>This simulates a small fleet of survey drones mapping an area while their radio links (LTE, LoRa, Wi-Fi mesh) misbehave, so you can see what a ground station would actually know.</p><p>A starter mission is already loaded. This 1-minute tour shows you around.</p>` },
-  { sel: '#map', title: 'The survey area', html: `<p>The outlined block is the area to survey. Drones launch from the base (its first corner) and sweep it in lanes.</p><p><b style="color:#d9a441">Amber</b> cells have been photographed by a drone. They turn <b style="color:#5fae6b">green</b> once the ground station has confirmed them.</p>` },
-  { sel: '#btnRun', title: 'Start, pause, reset', html: `<p>Press <b>Start</b>. These controls stay pinned at the top, so you never have to scroll for them. <b>Reset run</b> starts the same plan again.</p>` },
-  { sel: '#top .scale', title: 'Speed', html: `<p>Sim time runs faster than real time. Slide this up to skip ahead, or down to watch a moment closely.</p>` },
-  { sel: '#top .mini', title: 'Live scoreboard', html: `<p>Elapsed sim time, how much of the area the ground station has <i>confirmed</i>, and how many hidden anomalies (think “things worth a second look”) have been found.</p>` },
-  { sel: '#drones', title: 'Break something', html: `<p>One row per drone. Click an <b>LTE</b> or <b>LoRa</b> button to cut that link mid-flight and watch what happens: LoRa still carries position and detections, and a drone that loses everything returns home while the others take over its lanes.</p><p>In the demo, D2 loses both links at about 1 minute.</p>` },
-  { sel: '#chalWrap', title: 'Goals', html: `<p>Each mission has goals: coverage, anomalies found, no near-misses, finish on time. They tick off as you go, and you get a medal at the end.</p>` },
-  { sel: '#btnPlan', title: 'Tweak the plan', html: `<p>Change the number of drones, lane width, speed or heading in the sections above, then press <b>Apply &amp; re-plan</b>. Does a fourth drone beat a faster cruise speed? The Power &amp; cost section prices it.</p>` },
-  { sel: '#btnEnv', title: 'Decay, renewal & public data', html: `<p><b>Fetch land use…</b> outlines abandoned or ruined places (red), construction sites (cyan) and heritage (purple) from OpenStreetMap. Further up are NASA and EU overlays for greenness, heat, night lights and water change.</p><p>Tick <b>Compare past vs today</b> for a swipe between current imagery and an older release, handy for spotting what has been demolished, built or overgrown.</p>` },
-  { sel: '#btnDraw', title: 'Your own area', html: `<p><b>Draw area</b> lets you click out any polygon on the map. The “Site challenges” menu has harder missions with bad radio conditions, and “Fetch roads” pulls real road data from OpenStreetMap.</p>` },
-  { center: true, title: 'You’re set 🚁', html: `<p>Press <b>Start</b> and have a play. Reopen this tour any time with <b>? Tour</b>, or reload the example with <b>▶ Try the demo</b>.</p>` },
+  { center: true, title: 'Welcome aboard 👋', html: `<p>This simulates a small fleet of survey drones mapping an area while their radio links (LTE, LoRa, Wi-Fi mesh) misbehave, so you can see what a ground station would actually know.</p><p>In about two minutes you will <b>draw an area</b>, <b>fly it</b>, and <b>break a link</b> to watch the failover.</p>` },
+  { sel: '#btnDraw', pos: 'br', wait: 'draw', title: '1 · Draw your survey area', html: `<p>Press <b>Draw area</b>, then click at least 3 corners on the map around somewhere you want surveyed (a few city blocks is ideal). Press <b>Close polygon</b> to finish.</p><p class="dim">The first corner becomes the launch base.</p>`,
+    extra: [{ a: 'sample', label: 'Use a sample area instead' }] },
+  { sel: '#btnPlan', title: '2 · The plan', html: `<p>The map now shows the lanes each drone will sweep. Change the drone count, lane width or heading in <b>Fleet &amp; survey plan</b> and press <b>Apply &amp; re-plan</b>. The Power &amp; cost section prices the result.</p>` },
+  { sel: '#hudRun', pos: 'br', wait: 'start', title: '3 · Fly it', html: `<p>Press <b>Start</b> on the map. The speed slider in the left panel skips ahead. <b style="color:#d9a441">Amber</b> cells are photographed; they turn <b style="color:#5fae6b">green</b> once the ground station confirms them.</p>` },
+  { sel: '#hudFaults', pos: 'br', wait: 'fault', title: '4 · Break a link', html: `<p>Click an <b>LTE</b> or <b>LoRa</b> button to cut it mid-flight. LoRa still carries position and detections; a drone that loses everything returns home and the others pick up its lanes. Click again to restore.</p>` },
+  { sel: '#hudStat', pos: 'br', title: 'Scoreboard', html: `<p>Sim time, coverage the ground station has <i>confirmed</i>, and hidden anomalies found. The left panel has goals, costs, message logs and more.</p>` },
+  { sel: '#lyr', pos: 'br', onShow: () => { lOpen = true; lRender(); }, title: 'Layers, GIS style', html: `<p>Every map layer is here. ● / ○ shows or hides it, ▲▼ restack it, and clicking a name opens <b>opacity</b> and a <b>blend mode</b> (multiply, overlay, difference…), as in a GIS or an image editor. Try the satellite and streets layers together.</p>` },
+  { sel: '#libSel', title: 'Polygon library', html: `<p>Save any area you drew, reuse built-in samples, and import or export <b>GeoJSON</b> so areas move between this and your GIS.</p>` },
+  { sel: '#btnEnv', title: 'Decay, renewal & public data', html: `<p><b>Fetch land use…</b> outlines abandoned or ruined places (red), construction (cyan) and heritage (purple) from OpenStreetMap. Above are NASA and EU overlays; <b>Compare past vs today</b> swipes between current and older imagery.</p>` },
+  { center: true, title: 'You’re set 🚁', html: `<p>Reopen this tour with <b>? Tour</b>, or press <b>▶ Try the demo</b> for a ready-made mission. Everything autosaves in your browser.</p>` },
 ];
 let tourI = -1, tourEl = null;
 function tourClear() { if (tourEl) tourEl.classList.remove('tour-hl'); tourEl = null; }
-function tourEnd() {
-  tourClear(); tourI = -1; $('tour').hidden = true; $('veil').hidden = true; store.set('tourSeen', '1');
+function tourEnd() { tourClear(); tourI = -1; $('tour').hidden = true; $('veil').hidden = true; store.set('tourSeen', '1'); }
+function tourSignal(name) {
+  const at = tourI;
+  if (at >= 0 && TOUR[at].wait === name) setTimeout(() => { if (tourI === at) tourShow(at + 1); }, 800);
 }
 function tourShow(i) {
   tourClear(); tourI = i;
   const st = TOUR[i], box = $('tour'), last = i === TOUR.length - 1;
+  if (st.onShow) st.onShow();
   box.className = st.center ? 'center' : '';
   box.innerHTML = `<h3>${st.title}</h3>${st.html}<div class="nav"><span class="step">${i + 1} / ${TOUR.length}</span>` +
     (i > 0 ? '<button data-a="back">Back</button>' : '') +
-    (last ? '' : '<button data-a="skip">Skip</button>') +
-    `<button class="primary" data-a="next">${last ? 'Let’s go' : i === 0 ? 'Start tour' : 'Next'}</button></div>`;
+    (st.extra || []).map(x => `<button data-a="${x.a}">${x.label}</button>`).join('') +
+    (last || st.wait ? '' : '<button data-a="skip">Skip</button>') +
+    `<button class="primary" data-a="next">${last ? 'Let’s go' : i === 0 ? 'Start tour' : st.wait ? 'Skip step' : 'Next'}</button></div>`;
   $('veil').hidden = !st.center; box.hidden = false;
-  if (st.center) { box.style.left = box.style.top = ''; return; }
-  const el = document.querySelector(st.sel);
-  if (el) { tourEl = el; el.classList.add('tour-hl'); if (el.closest('#side')) el.scrollIntoView({ block: 'center' }); }
-  const narrow = window.innerWidth <= 800, side = $('side').getBoundingClientRect(), r = el ? el.getBoundingClientRect() : side;
-  box.style.transform = 'none';
-  if (narrow) { box.style.left = '12px'; box.style.top = '8px'; }
+  box.style.cssText = '';
+  if (st.center) return;
+  const el = document.querySelector(st.sel), ok = el && el.getClientRects().length;
+  if (ok) { tourEl = el; el.classList.add('tour-hl'); if (el.closest('#side')) el.scrollIntoView({ block: 'center' }); }
+  const narrow = window.innerWidth <= 800, side = $('side').getBoundingClientRect(), r = ok ? el.getBoundingClientRect() : side;
+  if (st.pos === 'br' && !narrow) { box.style.right = '16px'; box.style.bottom = '16px'; box.style.left = 'auto'; box.style.top = 'auto'; }
+  else if (narrow) { box.style.left = '12px'; box.style.top = '8px'; }
   else {
     box.style.left = Math.min(window.innerWidth - box.offsetWidth - 12, side.right + 16) + 'px';
-    const mapTarget = st.sel === '#map';
-    box.style.top = (mapTarget ? 70 : Math.max(8, Math.min(window.innerHeight - box.offsetHeight - 8, r.top - 10))) + 'px';
+    box.style.top = Math.max(8, Math.min(window.innerHeight - box.offsetHeight - 8, r.top - 10)) + 'px';
   }
 }
 $('tour').onclick = e => {
   const a = e.target.dataset.a; if (!a) return;
   if (a === 'skip') return tourEnd();
   if (a === 'back') return tourShow(tourI - 1);
+  if (a === 'sample') { loadPreset('demo'); return; }
   if (tourI >= TOUR.length - 1) return tourEnd();
   tourShow(tourI + 1);
 };
 document.addEventListener('keydown', e => { if (tourI >= 0 && e.key === 'Escape') tourEnd(); });
-function startTour() { if (!mission) loadPreset('demo'); tourShow(0); }
+function startTour() { tourShow(0); }
 $('btnHelp').onclick = startTour;
 $('btnDemo').onclick = () => { loadPreset('demo'); };
 
@@ -1672,7 +1880,7 @@ renderPoiTable(defaultPoiCfg());
 syncLabels(); setControls();
 refreshMissionList('').then(() => {
   if (store.get('tourSeen')) return;
-  startTour();      // first visit: load the starter so the map isn't empty, then guide
+  startTour();      // first visit: walk through drawing an area
 }).catch(err => setHint('IndexedDB unavailable: ' + err));
 </script>
 </body>
