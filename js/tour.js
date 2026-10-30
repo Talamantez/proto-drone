@@ -6,9 +6,9 @@ import { lRender } from './layerpanel.js';
 import { loadPreset } from './challenges.js';
 
 export const TOUR = [
-  { center: true, title: 'Welcome aboard 👋', html: `<p>This simulates a small fleet of survey drones mapping an area while their radio links (LTE, LoRa, Wi-Fi mesh) misbehave, so you can see what a ground station would actually know.</p><p>In about two minutes you will <b>draw an area</b>, <b>fly it</b>, and <b>break a link</b> to watch the failover.</p>` },
-  { sel: '#dbDraw', pos: 'tr', wait: 'draw', title: '1 · Draw your survey area', html: `<p>Press <b>Draw area</b> at the bottom of the map, then click at least 3 corners around somewhere you want surveyed (a few city blocks is ideal). Press <b>Close polygon</b> to finish.</p><p class="dim">The first corner becomes the launch base. Search for a place at the top to get there first.</p>`,
-    m: `<p>Tap <b>Draw area</b>, tap 3+ corners around a place, then <b>Close polygon</b>. Search at the top to go somewhere first.</p>`,
+  { center: true, title: 'Welcome aboard 👋', html: `<p>This simulates a small fleet of survey drones mapping an area while their radio links (LTE, LoRa, Wi-Fi mesh) misbehave. Can the survey still get done?</p><p>In about two minutes you will <b>draw an area</b>, <b>fly it</b>, and <b>break a link</b> to watch the failover.</p>` },
+  { sel: '#dbDraw', pos: 'tr', wait: 'draw', title: '1 · Draw your survey area', html: `<p>Press <b>Draw area</b> at the bottom of the map, then click at least 3 corners around somewhere you want surveyed (a few city blocks is ideal). Prefer to sketch? Switch to <b>✏ Pen</b> and drag around the area, or pick a ready-made <b>⬡ Shape</b> and scale it. Press <b>Close polygon</b> to finish.</p><p class="dim">The first corner becomes the launch base. Search for a place at the top to get there first.</p>`,
+    m: `<p>Tap <b>Draw area</b>, tap 3+ corners around a place (or use <b>✏ Pen</b> or a <b>⬡ Shape</b>), then <b>Close polygon</b>. Search at the top to go somewhere first.</p>`,
     extra: [{ a: 'sample', label: 'Use a sample area instead' }] },
   { sel: '#btnPlan', title: '2 · The plan', html: `<p>The map now shows the lanes each drone will sweep. Change the drone count, lane width or heading in <b>Fleet &amp; survey plan</b> and press <b>Apply &amp; re-plan</b>. The Power &amp; cost section prices the result.</p>`,
     m: `<p>Lanes now show on the map. Change drones, lane width or heading below, then <b>Apply &amp; re-plan</b>.</p>` },

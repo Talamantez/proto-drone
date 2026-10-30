@@ -180,6 +180,13 @@
     <div id="hud"><button id="hudRun" class="primary" disabled>Start</button><button id="hudReset" disabled>Reset</button><span id="hudStat">Time <b id="hTime">–</b> · Coverage <b id="hCov">–</b> · Found <b id="hFound">–</b></span></div>
     <div id="mapBottom">
       <div id="mapHint" hidden></div>
+      <div id="drawGuide" hidden>
+        <div id="dgSteps"><span>1 · Outline the area</span><span>2 · Close it</span></div>
+        <div id="dgTitle"></div>
+        <div id="dgBody" class="dim"></div>
+        <div id="dgTools"><button data-tool="points">📍 Tap corners</button><button data-tool="pen">✏ Pen</button><button data-tool="shape">⬡ Shape</button></div>
+        <div id="dgShape" hidden><select id="dgShapeSel" aria-label="Shape"></select><input type="range" id="dgSize" min="50" max="2000" step="10" value="300" aria-label="Size in metres"><span id="dgSizeV">300 m</span></div>
+      </div>
       <div id="drawBar">
         <button id="dbDraw" class="cta not-drawing">✏ Draw area</button>
         <button id="dbDemo" class="demo not-drawing">Try the demo</button>
@@ -190,7 +197,8 @@
     </div>
     <div id="hudFaults" hidden><div class="t">Break a link</div><div id="hudFaultRows"></div></div>
     <div id="threatBox" hidden>
-      <button id="btnThreats" class="atk">⚔ Threats</button>
+      <div id="threatQuick"><button data-q="0" class="zilla" title="Release a monster that jams radios and destroys aircraft">🦖 Godzilla</button><button data-q="1" class="rogue" title="Release a hostile drone that hijacks or rams yours">🛸 Rogue drone</button></div>
+      <button id="btnThreats" class="atk">⚔ More threats</button>
       <div id="threatMenu" hidden>
         <div class="t">Shields</div>
         <div id="shieldSeg"><button data-lvl="off">Off</button><button data-lvl="basic">Basic</button><button data-lvl="full">Full</button></div>
